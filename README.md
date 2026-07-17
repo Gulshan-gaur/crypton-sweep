@@ -33,6 +33,29 @@ cargo run -- report reports/client-network.json --out reports/client-network.htm
 `8883` is the conventional MQTT-over-TLS port. A reachable service without TLS evidence is
 reported as **not characterized**, not as secure and not as proof of compromise.
 
+To scan every TCP port on one authorized host, use the bounded parallel scanner:
+
+```bash
+cargo run -- discover \
+  --target 192.168.1.38 \
+  --all-ports \
+  --timeout-ms 300 \
+  --out reports/full-host.json
+```
+
+`--all-ports` means ports `1-65535` on the specified target. It does not scan the whole LAN;
+provide each approved host with another `--target` argument. Use `--tls` when you want the tool
+to attempt TLS characterization on every reachable port:
+
+```bash
+cargo run -- discover --target 192.168.1.38 --all-ports --tls \
+  --timeout-ms 300 --out reports/full-host-tls.json
+```
+
+`TLS services` counts only services where the OpenSSL handshake produced usable TLS evidence.
+An open TCP port alone is not a TLS service. If the target has no TLS listener, the value remains
+zero even though the scan found other services.
+
 Import a CycloneDX JSON SBOM:
 
 ```bash

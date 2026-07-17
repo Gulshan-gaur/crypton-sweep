@@ -7,6 +7,9 @@ use std::fs;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -30,6 +33,9 @@ enum CommandKind {
         target: Vec<String>,
         #[arg(short, long, default_value = "22,80,443,1883,1884,8443,7878")]
         ports: String,
+        /// Scan TCP ports 1 through 65535. Overrides --ports.
+        #[arg(long)]
+        all_ports: bool,
         #[arg(long, default_value_t = 800)]
         timeout_ms: u64,
         #[arg(long)]
@@ -170,6 +176,7 @@ fn main() -> Result<()> {
         CommandKind::Discover {
             target,
             ports,
+            all_ports,
             timeout_ms,
             tls,
             out,
@@ -177,10 +184,11 @@ fn main() -> Result<()> {
             println!(
                 "[crypton-sweep] scanning {} target(s), ports: {} (timeout: {} ms)",
                 target.len(),
-                ports,
+                if all_ports { "1-65535" } else { &ports },
                 timeout_ms
             );
-            let report = discover(&target, &ports, timeout_ms, tls)?;
+            let port_spec = if all_ports { "1-65535" } else { &ports };
+            let report = discover(&target, port_spec, timeout_ms, tls)?;
             write_json(&out, &report)?;
             println!(
                 "[crypton-sweep] found {} reachable service(s); wrote {}",
@@ -224,61 +232,14 @@ fn main() -> Result<()> {
 }
 
 fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> Result<ScanReport> {
-    let ports: Vec<u16> = ports
-        .split(',')
-        .filter_map(|p| p.trim().parse().ok())
-        .collect();
+    let ports = parse_ports(ports)?;
     if ports.is_empty() {
         anyhow::bail!("no valid ports supplied; use values such as --ports 1883,443,8443");
     }
     let mut assets = Vec::new();
     for host in targets {
         println!("[scan] target={host}");
-        for port in &ports {
-            let started = Instant::now();
-            let address = format!("{host}:{port}");
-            let reachable = address
-                .to_socket_addrs()
-                .ok()
-                .and_then(|mut addrs| addrs.next())
-                .and_then(|addr| {
-                    TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)).ok()
-                })
-                .is_some();
-            if !reachable {
-                continue;
-            }
-            println!(
-                "[open] {address} reachable in {:.2} ms",
-                started.elapsed().as_secs_f64() * 1000.0
-            );
-            let tls_observation = if use_tls && matches!(*port, 443 | 8883 | 8443 | 7878) {
-                println!("[tls] probing {address} with openssl");
-                probe_openssl(&address).ok()
-            } else {
-                None
-            };
-            let crypto = crypto_from_tls(tls_observation.as_ref());
-            let (risk, findings, recommendation) = assess(&crypto, tls_observation.as_ref(), *port);
-            assets.push(Asset {
-                id: format!("{host}:{port}"),
-                host: host.clone(),
-                port: *port,
-                service: service_for_port(*port).into(),
-                protocol: if tls_observation.is_some() {
-                    "TLS".into()
-                } else {
-                    service_for_port(*port).into()
-                },
-                reachable: true,
-                latency_ms: Some(started.elapsed().as_secs_f64() * 1000.0),
-                tls: tls_observation,
-                crypto,
-                risk,
-                findings,
-                recommendation,
-            });
-        }
+        assets.extend(scan_host(host, &ports, timeout_ms, use_tls)?);
     }
     Ok(finalize_report(
         "network",
@@ -298,8 +259,126 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
     ))
 }
 
+fn parse_ports(spec: &str) -> Result<Vec<u16>> {
+    let mut ports = Vec::new();
+    for item in spec
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+    {
+        if let Some((first, last)) = item.split_once('-') {
+            let first: u16 = first
+                .trim()
+                .parse()
+                .with_context(|| format!("invalid port range start: {first}"))?;
+            let last: u16 = last
+                .trim()
+                .parse()
+                .with_context(|| format!("invalid port range end: {last}"))?;
+            if first == 0 || last == 0 || first > last {
+                anyhow::bail!("invalid port range {item}; expected 1-65535");
+            }
+            ports.extend(first..=last);
+        } else {
+            let port: u16 = item
+                .parse()
+                .with_context(|| format!("invalid port: {item}"))?;
+            if port == 0 {
+                anyhow::bail!("port 0 is not a TCP service port");
+            }
+            ports.push(port);
+        }
+    }
+    ports.sort_unstable();
+    ports.dedup();
+    Ok(ports)
+}
+
+fn scan_host(host: &str, ports: &[u16], timeout_ms: u64, use_tls: bool) -> Result<Vec<Asset>> {
+    let address = format!("{host}:0");
+    let ip = address
+        .to_socket_addrs()
+        .with_context(|| format!("cannot resolve target {host}"))?
+        .next()
+        .map(|addr| addr.ip())
+        .with_context(|| format!("target {host} resolved to no address"))?;
+    let ports = Arc::new(ports.to_vec());
+    let next = Arc::new(AtomicUsize::new(0));
+    let results = Arc::new(Mutex::new(Vec::new()));
+    let workers = ports.len().clamp(1, 64);
+    let completed = Arc::new(AtomicUsize::new(0));
+
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            let ports = Arc::clone(&ports);
+            let next = Arc::clone(&next);
+            let results = Arc::clone(&results);
+            let completed = Arc::clone(&completed);
+            scope.spawn(move || loop {
+                let index = next.fetch_add(1, Ordering::Relaxed);
+                if index >= ports.len() {
+                    break;
+                }
+                let port = ports[index];
+                let started = Instant::now();
+                let socket = std::net::SocketAddr::new(ip, port);
+                let reachable =
+                    TcpStream::connect_timeout(&socket, Duration::from_millis(timeout_ms)).is_ok();
+                let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
+                if done % 1000 == 0 && ports.len() > 2000 {
+                    println!("[scan] {host}: {done}/{} ports checked", ports.len());
+                }
+                if !reachable {
+                    continue;
+                }
+                let endpoint = format!("{host}:{port}");
+                println!(
+                    "[open] {endpoint} reachable in {:.2} ms",
+                    started.elapsed().as_secs_f64() * 1000.0
+                );
+                let tls_observation = if use_tls {
+                    println!("[tls] probing {endpoint} with openssl");
+                    probe_openssl(&endpoint).ok()
+                } else {
+                    None
+                };
+                let crypto = crypto_from_tls(tls_observation.as_ref());
+                let (risk, findings, recommendation) =
+                    assess(&crypto, tls_observation.as_ref(), port);
+                results
+                    .lock()
+                    .expect("scan results mutex poisoned")
+                    .push(Asset {
+                        id: endpoint,
+                        host: host.to_string(),
+                        port,
+                        service: service_for_port(port).into(),
+                        protocol: if tls_observation.is_some() {
+                            "TLS".into()
+                        } else {
+                            service_for_port(port).into()
+                        },
+                        reachable: true,
+                        latency_ms: Some(started.elapsed().as_secs_f64() * 1000.0),
+                        tls: tls_observation,
+                        crypto,
+                        risk,
+                        findings,
+                        recommendation,
+                    });
+            });
+        }
+    });
+    let mut assets = Arc::try_unwrap(results)
+        .expect("scan results still referenced")
+        .into_inner()
+        .expect("scan results mutex poisoned");
+    assets.sort_by_key(|asset| asset.port);
+    Ok(assets)
+}
+
 fn probe_openssl(address: &str) -> Result<TlsObservation> {
-    let output = Command::new("openssl")
+    let mut child = Command::new("openssl")
         .args([
             "s_client",
             "-connect",
@@ -309,8 +388,20 @@ fn probe_openssl(address: &str) -> Result<TlsObservation> {
             address.split(':').next().unwrap_or(address),
         ])
         .stdin(Stdio::null())
-        .output()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .context("openssl is required for TLS probing")?;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while child.try_wait()?.is_none() {
+        if Instant::now() >= deadline {
+            child.kill().ok();
+            child.wait().ok();
+            anyhow::bail!("TLS probe timed out after 3 seconds");
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+    let output = child.wait_with_output()?;
     let text = format!(
         "{}{}",
         String::from_utf8_lossy(&output.stdout),
@@ -331,6 +422,13 @@ fn probe_openssl(address: &str) -> Result<TlsObservation> {
             observation.key_exchange = Some(after_colon(line));
         }
         observation.raw_evidence.push(line.to_string());
+    }
+    if observation.version.is_none()
+        && observation.cipher.is_none()
+        && observation.key_exchange.is_none()
+        && observation.signature_algorithm.is_none()
+    {
+        anyhow::bail!("OpenSSL did not complete a TLS handshake");
     }
     Ok(observation)
 }
