@@ -252,7 +252,7 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
                 "[open] {address} reachable in {:.2} ms",
                 started.elapsed().as_secs_f64() * 1000.0
             );
-            let tls_observation = if use_tls && matches!(*port, 443 | 8443 | 7878) {
+            let tls_observation = if use_tls && matches!(*port, 443 | 8883 | 8443 | 7878) {
                 println!("[tls] probing {address} with openssl");
                 probe_openssl(&address).ok()
             } else {
