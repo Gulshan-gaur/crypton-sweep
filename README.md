@@ -79,6 +79,21 @@ cargo run -- inventory examples/sample.cdx.json --out reports/inventory.json
 cargo run -- report reports/inventory.json --out reports/inventory.html
 ```
 
+CycloneDX CBOM-style JSON is imported through the same command. The current inventory parser
+reads the `components` array and detects cryptographic signals such as RSA, ECDSA, X25519,
+ML-KEM/Kyber, ML-DSA/Dilithium, and Falcon from component names, properties, and metadata:
+
+```bash
+cargo run -- inventory client-sbom.cdx.json --out reports/sbom-inventory.json
+cargo run -- inventory client-cbom.cdx.json --out reports/cbom-inventory.json
+cargo run -- report reports/cbom-inventory.json --out reports/cbom-report.html
+```
+
+The output keeps the evidence source as `software_inventory` and marks runtime negotiation as
+unverified. This is deliberate: an SBOM/CBOM describes declared or collected software evidence,
+while active discovery describes reachable network services. Use both reports for a client
+assessment. SPDX import and a dedicated structured CBOM asset parser are planned next.
+
 ## Output Model
 
 - Network assets and reachable services
@@ -88,6 +103,50 @@ cargo run -- report reports/inventory.json --out reports/inventory.html
 - Brownfield proxy candidate count
 - CycloneDX-derived component inventory
 - HTML report with KPI cards, algorithm profile, asset-to-algorithm graph, risk register, and migration posture
+
+### Full JSON Evidence
+
+The discovery JSON is designed as an evidence export. A full scan contains:
+
+| Field | Meaning |
+|---|---|
+| `scan_id` | Unique identifier for correlating the JSON and HTML report. |
+| `started_at`, `completed_at`, `duration_ms` | Scan execution timing. |
+| `scope` | Authorized targets and collection mode. |
+| `collection` | Port specification, attempted/reachable counts, worker count, timeout, TLS policy, and limitations. |
+| `summary` | Aggregated exposure and migration counts. |
+| `assets` | One record per reachable service. Closed or filtered ports are represented by collection counts, not by thousands of empty records. |
+| `connection` | TCP connection attempt outcome, latency, tool, and error. |
+| `service_detection` | Service name, detection method, confidence, and whether a banner was observed. |
+| `tls_probe` | Whether TLS probing was requested, successful, failed, timed out, and which tool produced the evidence. |
+| `tls` | Parsed TLS version, cipher, key exchange, signature, certificate, PQC group, and raw evidence when the handshake succeeds. |
+| `crypto` | Observed algorithms, PQC/hybrid flags, quantum-vulnerability signal, and evidence source. |
+| `risk`, `findings`, `recommendation` | Explainable risk posture and migration action. |
+| `relationships` | Knowledge-graph edges from assets to services, algorithms, or evidence states. |
+
+Generate a complete evidence export for one authorized host:
+
+```bash
+cargo run -- discover \
+  --target 192.168.1.38 \
+  --all-ports \
+  --tls \
+  --timeout-ms 300 \
+  --out reports/industry-scan.json
+```
+
+Inspect the full file with:
+
+```bash
+jq . reports/industry-scan.json
+jq '.assets[] | {id, connection, tls_probe, service_detection, crypto, risk, findings}' reports/industry-scan.json
+jq '{scan_id, duration_ms, collection, summary}' reports/industry-scan.json
+```
+
+The current file is a real active-scan export, not synthetic client data. A failed TLS probe
+means that OpenSSL could not establish TLS from this vantage point; it is not proof that the
+service is vulnerable. For production client assessments, combine this network evidence with
+authenticated host collection, passive traffic evidence, and SBOM/CBOM inventory.
 
 ## How This Maps To Industry Collection
 

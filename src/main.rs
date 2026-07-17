@@ -70,8 +70,12 @@ enum ReportFormat {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct ScanReport {
+    scan_id: String,
     schema_version: String,
     tool: String,
+    started_at: String,
+    completed_at: String,
+    duration_ms: f64,
     generated_at: String,
     scope: Scope,
     #[serde(default)]
@@ -84,9 +88,14 @@ struct ScanReport {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct Collection {
     method: String,
+    port_spec: String,
     attempted_ports: Vec<u16>,
+    attempted_port_count: usize,
+    reachable_port_count: usize,
+    worker_count: usize,
     timeout_ms: Option<u64>,
     tls_probe_requested: bool,
+    tls_probe_timeout_ms: u64,
     limitations: Vec<String>,
 }
 
@@ -120,11 +129,34 @@ struct Asset {
     protocol: String,
     reachable: bool,
     latency_ms: Option<f64>,
+    #[serde(default)]
+    connection: ProbeEvidence,
+    #[serde(default)]
+    tls_probe: ProbeEvidence,
+    #[serde(default)]
+    service_detection: ServiceDetection,
     tls: Option<TlsObservation>,
     crypto: CryptoProfile,
     risk: Risk,
     findings: Vec<Finding>,
     recommendation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct ProbeEvidence {
+    attempted: bool,
+    outcome: String,
+    duration_ms: Option<f64>,
+    tool: Option<String>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct ServiceDetection {
+    name: String,
+    method: String,
+    confidence: String,
+    banner_observed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -279,20 +311,22 @@ fn expand_targets(specs: &[String], max_targets: usize) -> Result<Vec<String>> {
             if let (Ok(first), Ok(last)) = (first.parse::<Ipv4Addr>(), last.parse::<Ipv4Addr>()) {
                 let first = u32::from(first);
                 let last = u32::from(last);
-                if first > last {
-                    anyhow::bail!("invalid target range {spec}; start must not exceed end");
-                }
-                let count = u64::from(last - first) + 1;
-                if count > max_targets as u64 {
-                    anyhow::bail!(
-                        "target {spec} expands to {count} hosts; increase --max-targets or use a smaller range"
-                    );
-                }
-                for value in first..=last {
-                    expanded.push(Ipv4Addr::from(value).to_string());
-                }
+                append_target_range(&mut expanded, first, last, spec, max_targets)?;
                 continue;
             }
+
+            // Accept the convenient LAN shorthand: 192.168.1.1-38.
+            if let (Ok(first), Ok(last_octet)) = (first.parse::<Ipv4Addr>(), last.parse::<u8>()) {
+                let first = u32::from(first);
+                let subnet = first & 0xffffff00;
+                let last = subnet + u32::from(last_octet);
+                append_target_range(&mut expanded, first, last, spec, max_targets)?;
+                continue;
+            }
+
+            anyhow::bail!(
+                "invalid target range {spec}; use 192.168.1.1-192.168.1.38 or 192.168.1.1-38"
+            );
         }
 
         if spec.contains('/') {
@@ -312,16 +346,43 @@ fn expand_targets(specs: &[String], max_targets: usize) -> Result<Vec<String>> {
     Ok(expanded)
 }
 
+fn append_target_range(
+    expanded: &mut Vec<String>,
+    first: u32,
+    last: u32,
+    spec: &str,
+    max_targets: usize,
+) -> Result<()> {
+    if first > last {
+        anyhow::bail!("invalid target range {spec}; start must not exceed end");
+    }
+    let count = u64::from(last - first) + 1;
+    if count > max_targets as u64 {
+        anyhow::bail!(
+            "target {spec} expands to {count} hosts; increase --max-targets or use a smaller range"
+        );
+    }
+    for value in first..=last {
+        expanded.push(Ipv4Addr::from(value).to_string());
+    }
+    Ok(())
+}
+
 fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> Result<ScanReport> {
+    let scan_started_at = Utc::now().to_rfc3339();
+    let scan_timer = Instant::now();
     let ports = parse_ports(ports)?;
     if ports.is_empty() {
         anyhow::bail!("no valid ports supplied; use values such as --ports 1883,443,8443");
     }
+    let attempted_port_count = targets.len() * ports.len();
+    let worker_count = ports.len().clamp(1, 64);
     let mut assets = Vec::new();
     for host in targets {
         println!("[scan] target={host}");
         assets.extend(scan_host(host, &ports, timeout_ms, use_tls)?);
     }
+    let reachable_port_count = assets.len();
     Ok(finalize_report(
         "network",
         true,
@@ -329,15 +390,34 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
         assets,
         Collection {
             method: "active TCP reachability scan".into(),
+            port_spec: ports_to_spec(&ports),
             attempted_ports: ports,
+            attempted_port_count,
+            reachable_port_count,
+            worker_count,
             timeout_ms: Some(timeout_ms),
             tls_probe_requested: use_tls,
+            tls_probe_timeout_ms: 3000,
             limitations: vec![
                 "Closed or filtered ports are not included as assets.".into(),
                 "A reachable non-TLS service does not reveal its application cryptography without a protocol-aware probe or host agent.".into(),
             ],
         },
+        scan_started_at,
+        scan_timer.elapsed().as_secs_f64() * 1000.0,
     ))
+}
+
+fn ports_to_spec(ports: &[u16]) -> String {
+    if ports.len() == 65_535 && ports.first() == Some(&1) && ports.last() == Some(&65_535) {
+        "1-65535".into()
+    } else {
+        ports
+            .iter()
+            .map(u16::to_string)
+            .collect::<Vec<_>>()
+            .join(",")
+    }
 }
 
 fn parse_ports(spec: &str) -> Result<Vec<u16>> {
@@ -405,6 +485,7 @@ fn scan_host(host: &str, ports: &[u16], timeout_ms: u64, use_tls: bool) -> Resul
                 let socket = std::net::SocketAddr::new(ip, port);
                 let reachable =
                     TcpStream::connect_timeout(&socket, Duration::from_millis(timeout_ms)).is_ok();
+                let connection_duration_ms = Some(started.elapsed().as_secs_f64() * 1000.0);
                 let done = completed.fetch_add(1, Ordering::Relaxed) + 1;
                 if done % 1000 == 0 && ports.len() > 2000 {
                     println!("[scan] {host}: {done}/{} ports checked", ports.len());
@@ -417,11 +498,40 @@ fn scan_host(host: &str, ports: &[u16], timeout_ms: u64, use_tls: bool) -> Resul
                     "[open] {endpoint} reachable in {:.2} ms",
                     started.elapsed().as_secs_f64() * 1000.0
                 );
-                let tls_observation = if use_tls {
+                let (tls_observation, tls_probe) = if use_tls {
                     println!("[tls] probing {endpoint} with openssl");
-                    probe_openssl(&endpoint).ok()
+                    let probe_started = Instant::now();
+                    match probe_openssl(&endpoint) {
+                        Ok(observation) => (
+                            Some(observation),
+                            ProbeEvidence {
+                                attempted: true,
+                                outcome: "success".into(),
+                                duration_ms: Some(probe_started.elapsed().as_secs_f64() * 1000.0),
+                                tool: Some("openssl s_client -brief".into()),
+                                error: None,
+                            },
+                        ),
+                        Err(error) => (
+                            None,
+                            ProbeEvidence {
+                                attempted: true,
+                                outcome: "failed".into(),
+                                duration_ms: Some(probe_started.elapsed().as_secs_f64() * 1000.0),
+                                tool: Some("openssl s_client -brief".into()),
+                                error: Some(error.to_string()),
+                            },
+                        ),
+                    }
                 } else {
-                    None
+                    (
+                        None,
+                        ProbeEvidence {
+                            attempted: false,
+                            outcome: "not_requested".into(),
+                            ..ProbeEvidence::default()
+                        },
+                    )
                 };
                 let crypto = crypto_from_tls(tls_observation.as_ref());
                 let (risk, findings, recommendation) =
@@ -440,7 +550,25 @@ fn scan_host(host: &str, ports: &[u16], timeout_ms: u64, use_tls: bool) -> Resul
                             service_for_port(port).into()
                         },
                         reachable: true,
-                        latency_ms: Some(started.elapsed().as_secs_f64() * 1000.0),
+                        latency_ms: connection_duration_ms,
+                        connection: ProbeEvidence {
+                            attempted: true,
+                            outcome: "reachable".into(),
+                            duration_ms: connection_duration_ms,
+                            tool: Some("TCP connect".into()),
+                            error: None,
+                        },
+                        tls_probe,
+                        service_detection: ServiceDetection {
+                            name: service_for_port(port).into(),
+                            method: "well_known_port_mapping".into(),
+                            confidence: if known_service_port(port) {
+                                "medium".into()
+                            } else {
+                                "low".into()
+                            },
+                            banner_observed: false,
+                        },
                         tls: tls_observation,
                         crypto,
                         risk,
@@ -564,6 +692,22 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
                 protocol: "component".into(),
                 reachable: true,
                 latency_ms: None,
+                connection: ProbeEvidence {
+                    attempted: false,
+                    outcome: "not_applicable".into(),
+                    ..ProbeEvidence::default()
+                },
+                tls_probe: ProbeEvidence {
+                    attempted: false,
+                    outcome: "not_applicable".into(),
+                    ..ProbeEvidence::default()
+                },
+                service_detection: ServiceDetection {
+                    name: "software component".into(),
+                    method: "cyclonedx_component".into(),
+                    confidence: "inventory".into(),
+                    banner_observed: false,
+                },
                 tls: None,
                 crypto,
                 risk,
@@ -579,7 +723,12 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
         assets,
         Collection {
             method: "CycloneDX component inventory".into(),
+            port_spec: "not_applicable".into(),
+            attempted_port_count: 0,
+            reachable_port_count: 0,
+            worker_count: 0,
             tls_probe_requested: false,
+            tls_probe_timeout_ms: 0,
             limitations: vec![
                 "Software inventory signals do not prove runtime negotiation.".into(),
                 "Validate deployed endpoints with an active or authenticated collection method."
@@ -587,6 +736,8 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
             ],
             ..Collection::default()
         },
+        Utc::now().to_rfc3339(),
+        0.0,
     ))
 }
 
@@ -722,13 +873,20 @@ fn service_for_port(port: u16) -> &'static str {
     }
 }
 
+fn known_service_port(port: u16) -> bool {
+    matches!(port, 22 | 80 | 443 | 1883 | 1884 | 7878 | 8443 | 8883)
+}
+
 fn finalize_report(
     mode: &str,
     authorized: bool,
     targets: Vec<String>,
     assets: Vec<Asset>,
     collection: Collection,
+    started_at: String,
+    duration_ms: f64,
 ) -> ScanReport {
+    let completed_at = Utc::now().to_rfc3339();
     let mut summary = Summary {
         assets: assets.len(),
         ..Summary::default()
@@ -778,9 +936,13 @@ fn finalize_report(
         }
     }
     ScanReport {
+        scan_id: format!("sweep-{}", Utc::now().timestamp_millis()),
         schema_version: "crypton-sweep/v1".into(),
         tool: format!("crypton-sweep/{VERSION}"),
-        generated_at: Utc::now().to_rfc3339(),
+        started_at,
+        completed_at: completed_at.clone(),
+        duration_ms,
+        generated_at: completed_at,
         scope: Scope {
             mode: mode.into(),
             authorized,
@@ -843,6 +1005,16 @@ mod tests {
         assert_eq!(
             parse_ports("80,443,8000-8002,443").unwrap(),
             vec![80, 443, 8000, 8001, 8002]
+        );
+    }
+
+    #[test]
+    fn expands_multiple_shorthand_ranges() {
+        let targets =
+            expand_targets(&["192.168.1.1-2".into(), "192.168.1.10-11".into()], 16).unwrap();
+        assert_eq!(
+            targets,
+            vec!["192.168.1.1", "192.168.1.10", "192.168.1.11", "192.168.1.2"]
         );
     }
 }
