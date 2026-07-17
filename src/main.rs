@@ -60,12 +60,27 @@ enum CommandKind {
         #[arg(long, value_enum, default_value_t = ReportFormat::Html)]
         format: ReportFormat,
     },
+    /// Export a normalized scan or inventory report as CycloneDX JSON.
+    ExportCyclonedx {
+        input: PathBuf,
+        #[arg(short, long, default_value = "cyclonedx.json")]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = CycloneDxKind::Combined)]
+        kind: CycloneDxKind,
+    },
 }
 
 #[derive(Clone, ValueEnum)]
 enum ReportFormat {
     Html,
     Json,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum CycloneDxKind {
+    Sbom,
+    Cbom,
+    Combined,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -206,6 +221,61 @@ struct Relationship {
     kind: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxBom {
+    #[serde(rename = "bomFormat")]
+    bom_format: String,
+    #[serde(rename = "specVersion")]
+    spec_version: String,
+    version: u32,
+    metadata: CycloneDxMetadata,
+    components: Vec<CycloneDxComponent>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    dependencies: Vec<CycloneDxDependency>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxMetadata {
+    timestamp: String,
+    tools: Vec<CycloneDxTool>,
+    properties: Vec<CycloneDxProperty>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxTool {
+    vendor: String,
+    name: String,
+    version: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxComponent {
+    #[serde(rename = "type")]
+    component_type: String,
+    name: String,
+    version: String,
+    #[serde(rename = "bom-ref")]
+    bom_ref: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    purl: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    properties: Vec<CycloneDxProperty>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxProperty {
+    name: String,
+    value: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CycloneDxDependency {
+    #[serde(rename = "ref")]
+    ref_: String,
+    #[serde(rename = "dependsOn")]
+    depends_on: Vec<String>,
+}
+
 fn main() -> Result<()> {
     match Cli::parse().command {
         CommandKind::Discover {
@@ -268,6 +338,18 @@ fn main() -> Result<()> {
             if matches!(format, ReportFormat::Html) {
                 println!("[crypton-sweep] open it with: xdg-open {}", out.display());
             }
+        }
+        CommandKind::ExportCyclonedx { input, out, kind } => {
+            let report: ScanReport = serde_json::from_slice(&fs::read(&input)?)
+                .with_context(|| format!("invalid Crypton Sweep report {}", input.display()))?;
+            let bom = export_cyclonedx(&report, kind);
+            write_cyclonedx(&out, &bom)?;
+            println!(
+                "[crypton-sweep] exported CycloneDX {} with {} component(s) to {}",
+                bom_kind_label(&bom),
+                bom.components.len(),
+                out.display()
+            );
         }
     }
     Ok(())
@@ -645,6 +727,16 @@ fn probe_openssl(address: &str) -> Result<TlsObservation> {
 fn inventory(path: &PathBuf) -> Result<ScanReport> {
     let value: Value = serde_json::from_slice(&fs::read(path)?)
         .with_context(|| format!("invalid CycloneDX JSON {}", path.display()))?;
+    let bom_format = value
+        .get("bomFormat")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    if !bom_format.eq_ignore_ascii_case("CycloneDX") {
+        anyhow::bail!(
+            "unsupported inventory format in {}; expected CycloneDX JSON with bomFormat=CycloneDX",
+            path.display()
+        );
+    }
     let mut assets = Vec::new();
     let mut targets = Vec::new();
     if let Some(components) = value.get("components").and_then(Value::as_array) {
@@ -739,6 +831,166 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
         Utc::now().to_rfc3339(),
         0.0,
     ))
+}
+
+fn export_cyclonedx(report: &ScanReport, kind: CycloneDxKind) -> CycloneDxBom {
+    let include_software = matches!(kind, CycloneDxKind::Sbom | CycloneDxKind::Combined);
+    let include_crypto = matches!(kind, CycloneDxKind::Cbom | CycloneDxKind::Combined);
+    let mut components = Vec::new();
+    let mut dependencies = Vec::new();
+
+    for asset in &report.assets {
+        let is_software = asset.port == 0 || asset.protocol == "component";
+        let is_network = asset.port != 0;
+        let has_crypto_evidence = !asset.crypto.algorithms.is_empty();
+        let include_asset = (is_software
+            && (include_software || (include_crypto && has_crypto_evidence)))
+            || (is_network && include_crypto);
+        if !include_asset {
+            continue;
+        }
+
+        let reference = asset_ref(&asset.id);
+        let mut properties = vec![
+            property(
+                "crypton.asset_type",
+                if is_network {
+                    "network_service"
+                } else {
+                    "software_component"
+                },
+            ),
+            property("crypton.evidence_source", &asset.crypto.evidence),
+            property("crypton.reachable", &asset.reachable.to_string()),
+            property("crypton.risk_level", &asset.risk.level),
+            property("crypton.risk_score", &asset.risk.score.to_string()),
+        ];
+        if is_network {
+            properties.push(property("crypton.host", &asset.host));
+            properties.push(property("crypton.port", &asset.port.to_string()));
+            properties.push(property("crypton.protocol", &asset.protocol));
+        }
+        for algorithm in &asset.crypto.algorithms {
+            properties.push(property("crypton.crypto_algorithm", algorithm));
+        }
+        if asset.crypto.algorithms.is_empty() {
+            properties.push(property(
+                "crypton.crypto_observation",
+                if asset.crypto.encryption_observed {
+                    "encryption_observed_algorithm_unknown"
+                } else {
+                    "not_observed"
+                },
+            ));
+        }
+        components.push(CycloneDxComponent {
+            component_type: "library".into(),
+            name: if is_network {
+                asset.service.clone()
+            } else {
+                asset.host.clone()
+            },
+            version: if is_network {
+                "runtime-observed".into()
+            } else {
+                asset.id.rsplit(':').next().unwrap_or("unknown").into()
+            },
+            bom_ref: reference.clone(),
+            purl: None,
+            properties,
+        });
+
+        let mut depends_on = Vec::new();
+        if include_crypto {
+            for algorithm in &asset.crypto.algorithms {
+                let algorithm_ref = algorithm_ref(algorithm);
+                if !components
+                    .iter()
+                    .any(|component| component.bom_ref == algorithm_ref)
+                {
+                    components.push(CycloneDxComponent {
+                        component_type: "library".into(),
+                        name: algorithm.clone(),
+                        version: "observed".into(),
+                        bom_ref: algorithm_ref.clone(),
+                        purl: None,
+                        properties: vec![
+                            property("crypton.asset_type", "cryptographic_algorithm"),
+                            property("crypton.algorithm", algorithm),
+                            property("crypton.evidence_source", &asset.crypto.evidence),
+                        ],
+                    });
+                }
+                depends_on.push(algorithm_ref);
+            }
+        }
+        if !depends_on.is_empty() {
+            dependencies.push(CycloneDxDependency {
+                ref_: reference,
+                depends_on,
+            });
+        }
+    }
+
+    let kind_label = match kind {
+        CycloneDxKind::Sbom => "sbom",
+        CycloneDxKind::Cbom => "cbom",
+        CycloneDxKind::Combined => "combined",
+    };
+    CycloneDxBom {
+        bom_format: "CycloneDX".into(),
+        spec_version: "1.5".into(),
+        version: 1,
+        metadata: CycloneDxMetadata {
+            timestamp: Utc::now().to_rfc3339(),
+            tools: vec![CycloneDxTool {
+                vendor: "Crypton".into(),
+                name: "Crypton Sweep".into(),
+                version: VERSION.into(),
+            }],
+            properties: vec![
+                property("crypton.bom_kind", kind_label),
+                property("crypton.source_report", &report.scan_id),
+                property("crypton.evidence_model", "network_and_software_inventory"),
+            ],
+        },
+        components,
+        dependencies,
+    }
+}
+
+fn property(name: &str, value: &str) -> CycloneDxProperty {
+    CycloneDxProperty {
+        name: name.into(),
+        value: value.into(),
+    }
+}
+
+fn asset_ref(id: &str) -> String {
+    format!("crypton:asset:{id}")
+}
+
+fn algorithm_ref(algorithm: &str) -> String {
+    format!("crypton:algorithm:{algorithm}")
+}
+
+fn bom_kind_label(bom: &CycloneDxBom) -> &str {
+    bom.metadata
+        .properties
+        .iter()
+        .find(|property| property.name == "crypton.bom_kind")
+        .map(|property| property.value.as_str())
+        .unwrap_or("combined")
+}
+
+fn write_cyclonedx(path: &PathBuf, bom: &CycloneDxBom) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent)?;
+        }
+    }
+    fs::write(path, serde_json::to_vec_pretty(bom)?)?;
+    Ok(())
 }
 
 fn assess(

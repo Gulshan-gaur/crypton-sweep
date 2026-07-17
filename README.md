@@ -94,6 +94,28 @@ unverified. This is deliberate: an SBOM/CBOM describes declared or collected sof
 while active discovery describes reachable network services. Use both reports for a client
 assessment. SPDX import and a dedicated structured CBOM asset parser are planned next.
 
+Export a normalized Crypton Sweep report back to CycloneDX:
+
+```bash
+# Software components only
+cargo run -- export-cyclonedx reports/inventory.json \
+  --kind sbom --out reports/crypton-sbom.cdx.json
+
+# Cryptographic/network evidence only
+cargo run -- export-cyclonedx reports/industry-scan.json \
+  --kind cbom --out reports/crypton-cbom.cdx.json
+
+# Combined software, service, and cryptographic evidence
+cargo run -- export-cyclonedx reports/industry-scan.json \
+  --kind combined --out reports/crypton-combined.cdx.json
+```
+
+The exporter emits CycloneDX JSON 1.5 with standard `components`, `dependencies`, metadata, and
+properties. Cryptographic assets are represented with explicit `crypton.asset_type` and
+`crypton.crypto_algorithm` properties so the output remains interoperable while retaining the
+tool's evidence provenance. It does not claim that an observed algorithm was negotiated when the
+source report only contains an inventory or an unknown observation.
+
 ## Output Model
 
 - Network assets and reachable services
