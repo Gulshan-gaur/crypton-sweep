@@ -749,20 +749,34 @@ fn finalize_report(
                     .any(|finding| finding.code == "MQTT-001"),
         );
     }
-    let relationships = assets
-        .iter()
-        .flat_map(|asset| {
-            asset
-                .crypto
-                .algorithms
-                .iter()
-                .map(move |algorithm| Relationship {
+    let mut relationships = Vec::new();
+    for asset in &assets {
+        let service = if asset.service.is_empty() {
+            &asset.protocol
+        } else {
+            &asset.service
+        };
+        relationships.push(Relationship {
+            source: asset.id.clone(),
+            target: format!("service:{service}"),
+            kind: "exposes".into(),
+        });
+        if asset.crypto.algorithms.is_empty() {
+            relationships.push(Relationship {
+                source: asset.id.clone(),
+                target: format!("evidence:{}", asset.crypto.evidence),
+                kind: "evidence".into(),
+            });
+        } else {
+            for algorithm in &asset.crypto.algorithms {
+                relationships.push(Relationship {
                     source: asset.id.clone(),
                     target: format!("algorithm:{algorithm}"),
                     kind: "uses".into(),
-                })
-        })
-        .collect();
+                });
+            }
+        }
+    }
     ScanReport {
         schema_version: "crypton-sweep/v1".into(),
         tool: format!("crypton-sweep/{VERSION}"),
