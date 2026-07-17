@@ -1,0 +1,6 @@
+/target/
+*.swp
+*.tmp
+reports/*.html
+reports/*.json
+

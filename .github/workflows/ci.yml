@@ -1,0 +1,17 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo fmt --check
+      - run: cargo check --all-targets
+      - run: cargo test
+      - run: cargo run -- inventory examples/sample.cdx.json --out /tmp/inventory.json
+      - run: cargo run -- report /tmp/inventory.json --out /tmp/report.html
