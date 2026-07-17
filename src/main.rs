@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::net::{TcpStream, ToSocketAddrs};
+use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -36,6 +36,9 @@ enum CommandKind {
         /// Scan TCP ports 1 through 65535. Overrides --ports.
         #[arg(long)]
         all_ports: bool,
+        /// Maximum expanded target count for CIDR/range input.
+        #[arg(long, default_value_t = 4096)]
+        max_targets: usize,
         #[arg(long, default_value_t = 800)]
         timeout_ms: u64,
         #[arg(long)]
@@ -177,6 +180,7 @@ fn main() -> Result<()> {
             target,
             ports,
             all_ports,
+            max_targets,
             timeout_ms,
             tls,
             out,
@@ -188,7 +192,13 @@ fn main() -> Result<()> {
                 timeout_ms
             );
             let port_spec = if all_ports { "1-65535" } else { &ports };
-            let report = discover(&target, port_spec, timeout_ms, tls)?;
+            let expanded_targets = expand_targets(&target, max_targets)?;
+            println!(
+                "[crypton-sweep] expanded {} target specification(s) to {} host(s)",
+                target.len(),
+                expanded_targets.len()
+            );
+            let report = discover(&expanded_targets, port_spec, timeout_ms, tls)?;
             write_json(&out, &report)?;
             println!(
                 "[crypton-sweep] found {} reachable service(s); wrote {}",
@@ -229,6 +239,77 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn expand_targets(specs: &[String], max_targets: usize) -> Result<Vec<String>> {
+    if max_targets == 0 {
+        anyhow::bail!("--max-targets must be greater than zero");
+    }
+    let mut expanded = Vec::new();
+    for spec in specs {
+        if let Some((address, prefix)) = spec.split_once('/') {
+            let ip: Ipv4Addr = address
+                .parse()
+                .with_context(|| format!("invalid IPv4 CIDR address: {address}"))?;
+            let prefix: u8 = prefix
+                .parse()
+                .with_context(|| format!("invalid CIDR prefix: {prefix}"))?;
+            if prefix > 32 {
+                anyhow::bail!("invalid CIDR prefix /{prefix}; expected /0 through /32");
+            }
+            let count = 1u64 << (32 - prefix);
+            if count > max_targets as u64 {
+                anyhow::bail!(
+                    "target {spec} expands to {count} hosts; increase --max-targets or use a smaller range"
+                );
+            }
+            let mask = if prefix == 0 {
+                0
+            } else {
+                u32::MAX << (32 - prefix)
+            };
+            let network = u32::from(ip) & mask;
+            for offset in 0..count {
+                expanded.push(Ipv4Addr::from(network + offset as u32).to_string());
+            }
+            continue;
+        }
+
+        if let Some((first, last)) = spec.split_once('-') {
+            if let (Ok(first), Ok(last)) = (first.parse::<Ipv4Addr>(), last.parse::<Ipv4Addr>()) {
+                let first = u32::from(first);
+                let last = u32::from(last);
+                if first > last {
+                    anyhow::bail!("invalid target range {spec}; start must not exceed end");
+                }
+                let count = u64::from(last - first) + 1;
+                if count > max_targets as u64 {
+                    anyhow::bail!(
+                        "target {spec} expands to {count} hosts; increase --max-targets or use a smaller range"
+                    );
+                }
+                for value in first..=last {
+                    expanded.push(Ipv4Addr::from(value).to_string());
+                }
+                continue;
+            }
+        }
+
+        if spec.contains('/') {
+            anyhow::bail!("unsupported target format {spec}; use an IPv4 address, CIDR, or range");
+        }
+        expanded.push(spec.clone());
+    }
+    expanded.sort();
+    expanded.dedup();
+    if expanded.len() > max_targets {
+        anyhow::bail!(
+            "target list expands to {} hosts; maximum is {}",
+            expanded.len(),
+            max_targets
+        );
+    }
+    Ok(expanded)
 }
 
 fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> Result<ScanReport> {
@@ -718,4 +799,36 @@ fn write_json(path: &PathBuf, report: &ScanReport) -> Result<()> {
 fn render_html(report: &ScanReport) -> String {
     let json = serde_json::to_string(report).expect("report is serializable");
     include_str!("../templates/report.html").replace("__REPORT_JSON__", &json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{expand_targets, parse_ports};
+
+    #[test]
+    fn expands_cidr_and_deduplicates_targets() {
+        let targets = expand_targets(
+            &["192.168.1.0/30".into(), "192.168.1.1-192.168.1.2".into()],
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            targets,
+            vec!["192.168.1.0", "192.168.1.1", "192.168.1.2", "192.168.1.3"]
+        );
+    }
+
+    #[test]
+    fn rejects_target_expansion_above_limit() {
+        let error = expand_targets(&["10.0.0.0/24".into()], 32).unwrap_err();
+        assert!(error.to_string().contains("expands to 256 hosts"));
+    }
+
+    #[test]
+    fn parses_port_ranges() {
+        assert_eq!(
+            parse_ports("80,443,8000-8002,443").unwrap(),
+            vec![80, 443, 8000, 8001, 8002]
+        );
+    }
 }

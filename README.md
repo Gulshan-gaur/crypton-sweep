@@ -56,6 +56,22 @@ cargo run -- discover --target 192.168.1.38 --all-ports --tls \
 An open TCP port alone is not a TLS service. If the target has no TLS listener, the value remains
 zero even though the scan found other services.
 
+Target ranges are supported for authorized IPv4 networks:
+
+```bash
+# CIDR notation, inclusive of every address in the block
+cargo run -- discover --target 192.168.1.0/24 --ports 1883,8883,443 --tls \
+  --out reports/subnet.json
+
+# Inclusive address range
+cargo run -- discover --target 192.168.1.10-192.168.1.50 --ports 1-10000 \
+  --out reports/range.json
+```
+
+The default expansion limit is 4,096 hosts. Change it explicitly with `--max-targets` only
+after confirming the authorized scope. A `/24` with `--all-ports` represents more than 16 million
+TCP connection attempts, so start with a focused port list and expand in stages.
+
 Import a CycloneDX JSON SBOM:
 
 ```bash
