@@ -157,18 +157,34 @@ fn main() -> Result<()> {
             tls,
             out,
         } => {
+            println!(
+                "[crypton-sweep] scanning {} target(s), ports: {} (timeout: {} ms)",
+                target.len(),
+                ports,
+                timeout_ms
+            );
             let report = discover(&target, &ports, timeout_ms, tls)?;
             write_json(&out, &report)?;
-            println!("wrote {} assets to {}", report.assets.len(), out.display());
+            println!(
+                "[crypton-sweep] found {} reachable service(s); wrote {}",
+                report.assets.len(),
+                out.display()
+            );
+            if report.assets.is_empty() {
+                println!("[crypton-sweep] no selected ports were reachable. Check the host, port list, firewall, and that the service is running.");
+            }
         }
         CommandKind::Inventory { input, out } => {
             let report = inventory(&input)?;
             write_json(&out, &report)?;
             println!(
-                "wrote {} inventory assets to {}",
+                "[crypton-sweep] imported {} inventory component(s); wrote {}",
                 report.assets.len(),
                 out.display()
             );
+            if report.assets.is_empty() {
+                println!("[crypton-sweep] the CycloneDX document has no top-level components.");
+            }
         }
         CommandKind::Report { input, out, format } => {
             let report: ScanReport = serde_json::from_slice(&fs::read(&input)?)
@@ -177,7 +193,14 @@ fn main() -> Result<()> {
                 ReportFormat::Html => fs::write(&out, render_html(&report))?,
                 ReportFormat::Json => write_json(&out, &report)?,
             }
-            println!("wrote report to {}", out.display());
+            println!(
+                "[crypton-sweep] report ready: {} assets, {} high-risk, {} PQC-capable",
+                report.summary.assets, report.summary.high_risk, report.summary.pqc_ready
+            );
+            println!("[crypton-sweep] wrote {}", out.display());
+            if matches!(format, ReportFormat::Html) {
+                println!("[crypton-sweep] open it with: xdg-open {}", out.display());
+            }
         }
     }
     Ok(())
@@ -190,6 +213,7 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
         .collect();
     let mut assets = Vec::new();
     for host in targets {
+        println!("[scan] target={host}");
         for port in &ports {
             let started = Instant::now();
             let address = format!("{host}:{port}");
@@ -204,7 +228,12 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
             if !reachable {
                 continue;
             }
+            println!(
+                "[open] {address} reachable in {:.2} ms",
+                started.elapsed().as_secs_f64() * 1000.0
+            );
             let tls_observation = if use_tls && matches!(*port, 443 | 8443 | 7878) {
+                println!("[tls] probing {address} with openssl");
                 probe_openssl(&address).ok()
             } else {
                 None
