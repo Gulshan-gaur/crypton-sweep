@@ -65,9 +65,20 @@ struct ScanReport {
     tool: String,
     generated_at: String,
     scope: Scope,
+    #[serde(default)]
+    collection: Collection,
     summary: Summary,
     assets: Vec<Asset>,
     relationships: Vec<Relationship>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct Collection {
+    method: String,
+    attempted_ports: Vec<u16>,
+    timeout_ms: Option<u64>,
+    tls_probe_requested: bool,
+    limitations: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -95,6 +106,8 @@ struct Asset {
     id: String,
     host: String,
     port: u16,
+    #[serde(default)]
+    service: String,
     protocol: String,
     reachable: bool,
     latency_ms: Option<f64>,
@@ -125,6 +138,10 @@ struct CryptoProfile {
     pqc_supported: bool,
     hybrid_supported: bool,
     quantum_vulnerable: bool,
+    #[serde(default)]
+    encryption_observed: bool,
+    #[serde(default)]
+    evidence: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -211,6 +228,9 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
         .split(',')
         .filter_map(|p| p.trim().parse().ok())
         .collect();
+    if ports.is_empty() {
+        anyhow::bail!("no valid ports supplied; use values such as --ports 1883,443,8443");
+    }
     let mut assets = Vec::new();
     for host in targets {
         println!("[scan] target={host}");
@@ -244,10 +264,11 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
                 id: format!("{host}:{port}"),
                 host: host.clone(),
                 port: *port,
+                service: service_for_port(*port).into(),
                 protocol: if tls_observation.is_some() {
                     "TLS".into()
                 } else {
-                    "TCP".into()
+                    service_for_port(*port).into()
                 },
                 reachable: true,
                 latency_ms: Some(started.elapsed().as_secs_f64() * 1000.0),
@@ -259,7 +280,22 @@ fn discover(targets: &[String], ports: &str, timeout_ms: u64, use_tls: bool) -> 
             });
         }
     }
-    Ok(finalize_report("network", true, targets.to_vec(), assets))
+    Ok(finalize_report(
+        "network",
+        true,
+        targets.to_vec(),
+        assets,
+        Collection {
+            method: "active TCP reachability scan".into(),
+            attempted_ports: ports,
+            timeout_ms: Some(timeout_ms),
+            tls_probe_requested: use_tls,
+            limitations: vec![
+                "Closed or filtered ports are not included as assets.".into(),
+                "A reachable non-TLS service does not reveal its application cryptography without a protocol-aware probe or host agent.".into(),
+            ],
+        },
+    ))
 }
 
 fn probe_openssl(address: &str) -> Result<TlsObservation> {
@@ -337,6 +373,7 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
                 .algorithms
                 .iter()
                 .any(|a| ["RSA", "ECDSA", "X25519"].contains(&a.as_str()));
+            crypto.evidence = "software_inventory".into();
             let (risk, findings, recommendation) = assess(&crypto, None, 0);
             let id = format!("component:{name}:{version}");
             targets.push(id.clone());
@@ -344,6 +381,7 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
                 id,
                 host: name.into(),
                 port: 0,
+                service: "software component".into(),
                 protocol: "component".into(),
                 reachable: true,
                 latency_ms: None,
@@ -355,7 +393,22 @@ fn inventory(path: &PathBuf) -> Result<ScanReport> {
             });
         }
     }
-    Ok(finalize_report("cyclonedx", true, targets, assets))
+    Ok(finalize_report(
+        "cyclonedx",
+        true,
+        targets,
+        assets,
+        Collection {
+            method: "CycloneDX component inventory".into(),
+            tls_probe_requested: false,
+            limitations: vec![
+                "Software inventory signals do not prove runtime negotiation.".into(),
+                "Validate deployed endpoints with an active or authenticated collection method."
+                    .into(),
+            ],
+            ..Collection::default()
+        },
+    ))
 }
 
 fn assess(
@@ -378,6 +431,23 @@ fn assess(
             detail: "The TLS observation did not identify a post-quantum or hybrid group.".into(),
         });
     }
+    if port == 1883 {
+        score = score.saturating_add(70);
+        findings.push(Finding {
+            code: "MQTT-001".into(),
+            severity: "high".into(),
+            title: "Plain MQTT listener observed".into(),
+            detail: "TCP port 1883 conventionally carries MQTT without TLS. This scan cannot verify payload confidentiality or device identity on this endpoint.".into(),
+        });
+    } else if tls.is_none() && port != 0 {
+        score = score.saturating_add(10);
+        findings.push(Finding {
+            code: "CRYPTO-UNKNOWN".into(),
+            severity: "medium".into(),
+            title: "Cryptography not characterized".into(),
+            detail: "Reachability proves that a service accepted TCP, but it does not prove encryption, authentication, or PQC support. Use a protocol-aware probe or authenticated agent.".into(),
+        });
+    }
     if port != 0 && tls.is_none() && matches!(port, 443 | 8443) {
         score = score.saturating_add(15);
         findings.push(Finding {
@@ -396,10 +466,14 @@ fn assess(
     } else {
         "low"
     };
-    let recommendation = if crypto.quantum_vulnerable {
+    let recommendation = if port == 1883 {
+        "Protect this brownfield MQTT path with MQTT over TLS/PQC or a Crypton proxy; then verify the secured listener."
+    } else if crypto.quantum_vulnerable {
         "Prioritize discovery and evaluate a Crypton proxy or SDK migration path."
     } else if crypto.pqc_supported {
         "Validate algorithm policy and add interoperability evidence."
+    } else if tls.is_none() && port != 0 {
+        "Run a protocol-aware probe or deploy an authenticated collector before declaring this service secure."
     } else {
         "Collect more cryptographic evidence before migration planning."
     };
@@ -415,6 +489,11 @@ fn assess(
 
 fn crypto_from_tls(tls: Option<&TlsObservation>) -> CryptoProfile {
     let mut crypto = CryptoProfile::default();
+    crypto.evidence = if tls.is_some() {
+        "tls_observation".into()
+    } else {
+        "not_observed".into()
+    };
     if let Some(tls) = tls {
         let text = format!(
             "{} {} {}",
@@ -448,7 +527,20 @@ fn crypto_from_tls(tls: Option<&TlsObservation>) -> CryptoProfile {
         .algorithms
         .iter()
         .any(|a| ["RSA", "ECDSA", "X25519"].contains(&a.as_str()));
+    crypto.encryption_observed = tls.is_some();
     crypto
+}
+
+fn service_for_port(port: u16) -> &'static str {
+    match port {
+        22 => "SSH",
+        80 => "HTTP",
+        443 | 8443 => "HTTPS/TLS",
+        1883 => "MQTT",
+        8883 => "MQTT over TLS",
+        7878 => "Crypton/secure channel candidate",
+        _ => "TCP service",
+    }
 }
 
 fn finalize_report(
@@ -456,6 +548,7 @@ fn finalize_report(
     authorized: bool,
     targets: Vec<String>,
     assets: Vec<Asset>,
+    collection: Collection,
 ) -> ScanReport {
     let mut summary = Summary {
         assets: assets.len(),
@@ -469,8 +562,13 @@ fn finalize_report(
         summary.classical_only +=
             usize::from(asset.crypto.quantum_vulnerable && !asset.crypto.pqc_supported);
         summary.high_risk += usize::from(asset.risk.level == "high");
-        summary.proxy_candidates +=
-            usize::from(asset.crypto.quantum_vulnerable && !asset.crypto.pqc_supported);
+        summary.proxy_candidates += usize::from(
+            (asset.crypto.quantum_vulnerable && !asset.crypto.pqc_supported)
+                || asset
+                    .findings
+                    .iter()
+                    .any(|finding| finding.code == "MQTT-001"),
+        );
     }
     let relationships = assets
         .iter()
@@ -495,6 +593,7 @@ fn finalize_report(
             authorized,
             targets,
         },
+        collection,
         summary,
         assets,
         relationships,
