@@ -1279,9 +1279,6 @@ fn startup_animation(disabled: bool) {
         return;
     }
 
-    let green = "\x1b[38;5;114m";
-    let mint = "\x1b[38;5;158m";
-    let lime = "\x1b[38;5;192m";
     let white = "\x1b[38;5;255m";
     let muted = "\x1b[38;5;245m";
     let panel = "\x1b[48;5;235m";
@@ -1297,16 +1294,13 @@ fn startup_animation(disabled: bool) {
     ];
 
     print!("\x1b[?25l\n{panel}");
-    println!("{mint}  ╭────────────────────────────────────────────────╮{reset}");
-    for (index, line) in logo.iter().enumerate() {
-        let color = if index == 3 { lime } else { green };
-        println!("{panel}{color}  │              {line}              │{reset}");
+    println!("{white}  ╭────────────────────────────────────────────────╮{reset}");
+    for line in logo {
+        println!("{panel}{white}  │              {line}              │{reset}");
     }
-    println!(
-        "{panel}{mint}  │   {white}C R Y P T O N   S W E E P{mint}                    │{reset}"
-    );
+    println!("{panel}{white}  │   C R Y P T O N   S W E E P                    │{reset}");
     println!("{panel}{muted}  │   post-quantum exposure intelligence             │{reset}");
-    println!("{panel}{mint}  ├────────────────────────────────────────────────┤{reset}");
+    println!("{panel}{white}  ├────────────────────────────────────────────────┤{reset}");
 
     let frames = [
         ("◐", "initializing evidence engine"),
@@ -1315,12 +1309,14 @@ fn startup_animation(disabled: bool) {
         ("◒", "preparing migration workspace"),
     ];
     for (spinner, message) in frames {
-        print!("{panel}{mint}  │   {spinner} {muted}{message:<42}{mint}│{reset}\r");
+        print!("{panel}{white}  │   {spinner} {muted}{message:<42}{white}│{reset}\r");
         io::stdout().flush().ok();
         thread::sleep(Duration::from_millis(110));
     }
-    println!("{panel}{mint}  │   {lime}✓{mint} {white}ready{muted}  ·  authorized local analysis{mint}       │{reset}");
-    println!("{mint}  ╰────────────────────────────────────────────────╯{reset}\n{reset}\x1b[?25h");
+    println!("{panel}{white}  │   ✓ {white}ready{muted}  ·  authorized local analysis       {white}│{reset}");
+    println!(
+        "{white}  ╰────────────────────────────────────────────────╯{reset}\n{reset}\x1b[?25h"
+    );
 }
 
 #[cfg(test)]

@@ -1,25 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
   <title id="title">Crypton Sweep cipher lattice</title>
   <desc id="desc">A hexagonal interlocking cipher lattice with six perimeter nodes</desc>
-  <defs>
-    <linearGradient id="field" x1="18" y1="10" x2="142" y2="150" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#073b27"/>
-      <stop offset="1" stop-color="#0b5135"/>
-    </linearGradient>
-  </defs>
-  <path d="M80 7 143 43v74l-63 36-63-36V43z" fill="url(#field)"/>
-  <path d="M80 15 136 47v66l-56 32-56-32V47z" fill="none" stroke="#c8ff4d" stroke-width="2.5"/>
-  <path d="M80 15v-5M136 47l6-3M136 113l6 3M80 145v7M24 113l-6 3M24 47l-6-3" stroke="#c8ff4d" stroke-width="2"/>
-  <g fill="#c8ff4d">
+  <path d="M80 7 143 43v74l-63 36-63-36V43z" fill="none" stroke="#101010" stroke-width="3"/>
+  <path d="M80 15 136 47v66l-56 32-56-32V47z" fill="none" stroke="#101010" stroke-width="2.5"/>
+  <path d="M80 15v-5M136 47l6-3M136 113l6 3M80 145v7M24 113l-6 3M24 47l-6-3" stroke="#101010" stroke-width="2"/>
+  <g fill="#101010">
     <circle cx="80" cy="10" r="4.5"/><circle cx="142" cy="44" r="4.5"/>
     <circle cx="142" cy="116" r="4.5"/><circle cx="80" cy="150" r="4.5"/>
     <circle cx="18" cy="116" r="4.5"/><circle cx="18" cy="44" r="4.5"/>
   </g>
-  <g fill="none" stroke="#fffefa" stroke-width="3" stroke-linejoin="round">
+  <g fill="none" stroke="#101010" stroke-width="3" stroke-linejoin="round">
     <path d="M80 37 111 55v36l-31 18-31-18V55z"/>
     <path d="M80 37v72M49 55l62 36M111 55 49 91"/>
     <path d="m35 64 45-26 45 26M35 96l45 26 45-26" opacity=".72"/>
   </g>
-  <path d="M80 61 95 70v18l-15 9-15-9V70z" fill="none" stroke="#9ed9b7" stroke-width="3"/>
-  <circle cx="80" cy="79" r="5" fill="#c8ff4d"/>
+  <path d="M80 61 95 70v18l-15 9-15-9V70z" fill="none" stroke="#101010" stroke-width="3"/>
+  <circle cx="80" cy="79" r="5" fill="#101010"/>
 </svg>
