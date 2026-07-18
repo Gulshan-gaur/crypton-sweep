@@ -13,5 +13,6 @@ jobs:
       - run: cargo fmt --check
       - run: cargo check --all-targets
       - run: cargo test
+      - run: cargo package --locked --allow-dirty
       - run: cargo run -- inventory examples/sample.cdx.json --out /tmp/inventory.json
       - run: cargo run -- report /tmp/inventory.json --out /tmp/report.html

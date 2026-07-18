@@ -4,6 +4,46 @@ Crypton Sweep is an open-source, authorized **network cipher sweeper** and PQC m
 
 It is intentionally separate from Crypton's proprietary protocol and proxy implementation.
 
+## Install
+
+Install from crates.io after publication:
+
+```bash
+cargo install crypton-sweep
+```
+
+Install the current source directly from GitHub:
+
+```bash
+cargo install --git https://github.com/Gulshan-gaur/crypton-sweep.git --branch main
+```
+
+For users without Rust, download a compiled binary from GitHub Releases. The tagged release
+workflow publishes archives for Linux, macOS, and Windows.
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf \
+  https://github.com/Gulshan-gaur/crypton-sweep/releases/latest/download/crypton-sweep-installer.sh | sh
+```
+
+The installer places the binary in `~/.local/bin`. Review downloaded scripts before executing
+them in a controlled enterprise environment.
+
+## Project Structure
+
+```text
+src/main.rs                  Rust CLI, scanner, inventory, exporter
+templates/report.html        Offline report dashboard template
+scripts/serve_report.py      Local-only static dashboard server
+scripts/install.sh           Unix release installer
+examples/                    Sample CycloneDX input
+docs/                        Architecture and release documentation
+.github/workflows/           CI and tagged release automation
+```
+
+The Rust binary performs scanning and report generation. Python only serves an already generated
+HTML file locally; it is not a runtime dependency of the scanner.
+
 ## Quick Start
 
 ```bash

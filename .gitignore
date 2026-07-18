@@ -5,3 +5,4 @@ __pycache__/
 *.tmp
 reports/*.html
 reports/*.json
+dist/
