@@ -60,6 +60,12 @@ enum CommandKind {
         #[arg(long, value_enum, default_value_t = ReportFormat::Html)]
         format: ReportFormat,
     },
+    /// Generate a browser dashboard with the same filename stem as the JSON input.
+    Dashboard {
+        input: PathBuf,
+        #[arg(long, default_value = "reports")]
+        out_dir: PathBuf,
+    },
     /// Export a normalized scan or inventory report as CycloneDX JSON.
     ExportCyclonedx {
         input: PathBuf,
@@ -339,6 +345,20 @@ fn main() -> Result<()> {
                 println!("[crypton-sweep] open it with: xdg-open {}", out.display());
             }
         }
+        CommandKind::Dashboard { input, out_dir } => {
+            let report: ScanReport = serde_json::from_slice(&fs::read(&input)?)
+                .with_context(|| format!("invalid scan report {}", input.display()))?;
+            let out = dashboard_path(&input, &out_dir)?;
+            fs::create_dir_all(&out_dir)?;
+            fs::write(&out, render_html(&report))?;
+            println!("[crypton-sweep] dashboard ready: {}", out.display());
+            println!(
+                "[crypton-sweep] serve it with: python3 scripts/serve_report.py --report {}",
+                out.file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("report.html")
+            );
+        }
         CommandKind::ExportCyclonedx { input, out, kind } => {
             let report: ScanReport = serde_json::from_slice(&fs::read(&input)?)
                 .with_context(|| format!("invalid Crypton Sweep report {}", input.display()))?;
@@ -535,6 +555,15 @@ fn parse_ports(spec: &str) -> Result<Vec<u16>> {
     ports.sort_unstable();
     ports.dedup();
     Ok(ports)
+}
+
+fn dashboard_path(input: &PathBuf, out_dir: &PathBuf) -> Result<PathBuf> {
+    let stem = input
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .filter(|value| !value.is_empty())
+        .with_context(|| format!("cannot derive dashboard name from {}", input.display()))?;
+    Ok(out_dir.join(format!("{stem}.html")))
 }
 
 fn scan_host(host: &str, ports: &[u16], timeout_ms: u64, use_tls: bool) -> Result<Vec<Asset>> {
@@ -1231,7 +1260,8 @@ fn render_html(report: &ScanReport) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{expand_targets, parse_ports};
+    use super::{dashboard_path, expand_targets, parse_ports};
+    use std::path::PathBuf;
 
     #[test]
     fn expands_cidr_and_deduplicates_targets() {
@@ -1268,5 +1298,11 @@ mod tests {
             targets,
             vec!["192.168.1.1", "192.168.1.10", "192.168.1.11", "192.168.1.2"]
         );
+    }
+
+    #[test]
+    fn dashboard_uses_json_stem() {
+        let path = dashboard_path(&"reports/industry-scan.json".into(), &"reports".into()).unwrap();
+        assert_eq!(path, PathBuf::from("reports/industry-scan.html"));
     }
 }

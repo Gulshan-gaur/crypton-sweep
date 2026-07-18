@@ -13,6 +13,20 @@ cargo run -- report reports/scan.json --out reports/scan.html
 
 Open `reports/scan.html` locally. The report has no runtime server or external JavaScript dependency.
 
+For the browser workflow, keep one shared report stem:
+
+```bash
+# Reads reports/scan.json and creates reports/scan.html
+cargo run -- dashboard reports/scan.json --out-dir reports
+
+# Starts a local Python server and opens the dashboard in your browser
+python3 scripts/serve_report.py --report scan.html
+```
+
+The Rust crate performs scanning, parsing, normalization, and HTML generation. The Python script
+only serves the already-generated static report on `127.0.0.1`; it is not part of the scanning or
+cryptographic logic and has no third-party dependency.
+
 The scanner runs from the network vantage point where the command is executed. It does not
 magically see services behind a firewall, on another VLAN, bound only to loopback, or on ports
 not included in `--ports`. For a client pilot, run the binary on an approved jump host inside the
