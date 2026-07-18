@@ -1,6 +1,7 @@
 /target/
+__pycache__/
+*.py[cod]
 *.swp
 *.tmp
 reports/*.html
 reports/*.json
-
