@@ -1279,40 +1279,48 @@ fn startup_animation(disabled: bool) {
         return;
     }
 
-    let frames = [
-        ("[........]", "initializing evidence engine"),
-        ("[##......]", "loading cryptographic policy"),
-        ("[####....]", "arming network observability"),
-        ("[######..]", "preparing migration workspace"),
-        ("[########]", "ready"),
-    ];
     let green = "\x1b[38;5;114m";
+    let mint = "\x1b[38;5;158m";
     let lime = "\x1b[38;5;192m";
+    let white = "\x1b[38;5;255m";
     let muted = "\x1b[38;5;245m";
+    let panel = "\x1b[48;5;235m";
     let reset = "\x1b[0m";
     let logo = [
-        "      /\\      ",
-        "  ___/  \\___  ",
-        " /   CRYPTON  \\ ",
-        " \\___  SWEEP_/ ",
-        "     \\__/     ",
+        "             /\\             ",
+        "        ____/  \\____        ",
+        "       /    \\  /    \\       ",
+        "       \\____/\\/____/       ",
+        "       /    /  \\    \\       ",
+        "       \\___/____\\___/       ",
+        "           \\____/           ",
     ];
 
-    for (index, (bar, message)) in frames.iter().enumerate() {
-        print!("\x1b[2K\r");
-        if index == 0 {
-            println!();
-            for line in logo {
-                println!("  {green}{line}{reset}");
-            }
-        }
-        print!("  {lime}CRYPTON SWEEP{reset} {muted}{bar}{reset} {message}");
-        io::stdout().flush().ok();
-        if index + 1 < frames.len() {
-            thread::sleep(Duration::from_millis(85));
-        }
+    print!("\x1b[?25l\n{panel}");
+    println!("{mint}  ╭────────────────────────────────────────────────╮{reset}");
+    for (index, line) in logo.iter().enumerate() {
+        let color = if index == 3 { lime } else { green };
+        println!("{panel}{color}  │              {line}              │{reset}");
     }
-    println!("\n  {muted}authorized discovery / PQC migration intelligence{reset}\n");
+    println!(
+        "{panel}{mint}  │   {white}C R Y P T O N   S W E E P{mint}                    │{reset}"
+    );
+    println!("{panel}{muted}  │   post-quantum exposure intelligence             │{reset}");
+    println!("{panel}{mint}  ├────────────────────────────────────────────────┤{reset}");
+
+    let frames = [
+        ("◐", "initializing evidence engine"),
+        ("◓", "loading cryptographic policy"),
+        ("◑", "arming network observability"),
+        ("◒", "preparing migration workspace"),
+    ];
+    for (spinner, message) in frames {
+        print!("{panel}{mint}  │   {spinner} {muted}{message:<42}{mint}│{reset}\r");
+        io::stdout().flush().ok();
+        thread::sleep(Duration::from_millis(110));
+    }
+    println!("{panel}{mint}  │   {lime}✓{mint} {white}ready{muted}  ·  authorized local analysis{mint}       │{reset}");
+    println!("{mint}  ╰────────────────────────────────────────────────╯{reset}\n{reset}\x1b[?25h");
 }
 
 #[cfg(test)]
