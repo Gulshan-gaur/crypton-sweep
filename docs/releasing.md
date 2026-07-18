@@ -41,3 +41,5 @@ to the GitHub Release.
 - Run `cargo fmt --check`, `cargo check --all-targets`, and `cargo test` before tagging.
 - Do not include `reports/`, `target/`, credentials, scan results, or client data in a release.
 - Treat network scan output as potentially sensitive and keep it outside public releases.
+- Verify the startup animation in a terminal and `--no-animation` in CI before tagging.
+- Open a generated HTML report and test browser print-to-PDF before tagging.

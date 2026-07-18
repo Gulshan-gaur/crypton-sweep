@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Crypton Sweep mark</title>
+  <desc id="desc">A geometric shield and cipher lattice mark</desc>
+  <defs>
+    <linearGradient id="g" x1="18" y1="12" x2="142" y2="148" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#073b27"/>
+      <stop offset="1" stop-color="#0b5135"/>
+    </linearGradient>
+  </defs>
+  <path d="M80 8 138 31v43c0 37-24 62-58 78C46 136 22 111 22 74V31z" fill="url(#g)"/>
+  <path d="M80 20 126 38v35c0 29-18 49-46 64-28-15-46-35-46-64V38z" fill="none" stroke="#c8ff4d" stroke-width="3"/>
+  <path d="m80 42 23 13v27L80 95 57 82V55zM57 82l23 14 23-14M80 42v53" fill="none" stroke="#fffefa" stroke-width="3" stroke-linejoin="round"/>
+  <path d="m42 61 38-22 38 22M42 99l38 22 38-22" fill="none" stroke="#9ed9b7" stroke-width="2" opacity=".9"/>
+  <circle cx="80" cy="42" r="5" fill="#c8ff4d"/><circle cx="57" cy="82" r="5" fill="#c8ff4d"/><circle cx="103" cy="82" r="5" fill="#c8ff4d"/>
+</svg>

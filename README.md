@@ -44,6 +44,18 @@ docs/                        Architecture and release documentation
 The Rust binary performs scanning and report generation. Python only serves an already generated
 HTML file locally; it is not a runtime dependency of the scanner.
 
+Every interactive command starts with a short Crypton Sweep terminal sequence. For CI, scripts,
+or plain logs, disable it explicitly:
+
+```bash
+crypton-sweep --no-animation discover --target 127.0.0.1 --ports 443
+NO_COLOR=1 crypton-sweep report reports/scan.json --out reports/scan.html
+```
+
+The HTML report contains an inline Crypton Sweep SVG mark and an `Export PDF` action. Select
+that action in a browser and choose **Save to PDF**; no external logo or network connection is
+required.
+
 ## Quick Start
 
 ```bash

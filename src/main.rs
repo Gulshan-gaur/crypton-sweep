@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -18,7 +19,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[command(
     name = "crypton-sweep",
     version,
-    about = "Authorized network cipher sweeper and PQC migration report generator"
+    about = "Authorized network cipher sweeper and PQC migration report generator",
+    after_help = "Global option: --no-animation disables the interactive startup sequence."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -283,7 +285,15 @@ struct CycloneDxDependency {
 }
 
 fn main() -> Result<()> {
-    match Cli::parse().command {
+    let raw_args: Vec<String> = std::env::args().collect();
+    let no_animation = raw_args.iter().skip(1).any(|arg| arg == "--no-animation");
+    let clap_args: Vec<String> = raw_args
+        .into_iter()
+        .filter(|arg| arg != "--no-animation")
+        .collect();
+    let cli = Cli::parse_from(clap_args);
+    startup_animation(no_animation);
+    match cli.command {
         CommandKind::Discover {
             target,
             ports,
@@ -1255,7 +1265,54 @@ fn write_json(path: &PathBuf, report: &ScanReport) -> Result<()> {
 
 fn render_html(report: &ScanReport) -> String {
     let json = serde_json::to_string(report).expect("report is serializable");
-    include_str!("../templates/report.html").replace("__REPORT_JSON__", &json)
+    include_str!("../templates/report.html")
+        .replace("__REPORT_JSON__", &json)
+        .replace(
+            "__CRYPTON_LOGO_SVG__",
+            include_str!("../assets/crypton-sweep-logo.svg"),
+        )
+}
+
+fn startup_animation(disabled: bool) {
+    if disabled || std::env::var_os("NO_COLOR").is_some() || !io::stdout().is_terminal() {
+        println!("Crypton Sweep v{VERSION} | PQC exposure intelligence");
+        return;
+    }
+
+    let frames = [
+        ("[........]", "initializing evidence engine"),
+        ("[##......]", "loading cryptographic policy"),
+        ("[####....]", "arming network observability"),
+        ("[######..]", "preparing migration workspace"),
+        ("[########]", "ready"),
+    ];
+    let green = "\x1b[38;5;114m";
+    let lime = "\x1b[38;5;192m";
+    let muted = "\x1b[38;5;245m";
+    let reset = "\x1b[0m";
+    let logo = [
+        "      /\\      ",
+        "  ___/  \\___  ",
+        " /   CRYPTON  \\ ",
+        " \\___  SWEEP_/ ",
+        "     \\__/     ",
+    ];
+
+    for (index, (bar, message)) in frames.iter().enumerate() {
+        print!("\x1b[2K\r");
+        if index == 0 {
+            println!();
+            for line in logo {
+                println!("  {green}{line}{reset}");
+            }
+        }
+        print!("  {lime}CRYPTON SWEEP{reset} {muted}{bar}{reset} {message}");
+        io::stdout().flush().ok();
+        if index + 1 < frames.len() {
+            thread::sleep(Duration::from_millis(85));
+        }
+    }
+    println!("\n  {muted}authorized discovery / PQC migration intelligence{reset}\n");
 }
 
 #[cfg(test)]
