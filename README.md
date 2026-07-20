@@ -105,7 +105,8 @@ crypton-sweep
 ```
 
 It shows the Crypton wordmark, subordinate `sweep` label, current digital clock, command prompt,
-and command palette. Both command styles are supported:
+and command palette. The prompt supports cursor movement, Home/End, Ctrl+A/Ctrl+E, and Up/Down
+command history. Both command styles are supported:
 
 ```text
 crypton-sweep > discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json
@@ -117,6 +118,21 @@ crypton-sweep > /exit
 Available slash commands include `/discover`, `/inventory`, `/report`, `/dashboard`, `/serve`,
 `/export-cyclonedx`, `/help`, `/clear`, and `/exit`. Direct subcommands remain available for
 automation and CI. Use `--no-animation` or `NO_COLOR=1` for plain terminal output.
+
+`/dashboard` generates the HTML and returns to the prompt. `/serve` generates the HTML and starts
+the local HTTP server, so that terminal is occupied while the server runs. To keep the interactive
+shell available, use a second terminal:
+
+```text
+# Terminal 1
+crypton-sweep
+crypton-sweep > /dashboard reports/scan.json --out-dir reports
+
+# Terminal 2
+crypton-sweep serve reports/scan.json --out-dir reports
+```
+
+The browser opens at `http://127.0.0.1:8765/scan.html`. Stop the server with `Ctrl+C` in Terminal 2.
 
 The scanner runs from the network vantage point where the command is executed. It does not
 magically see services behind a firewall, on another VLAN, bound only to loopback, or on ports

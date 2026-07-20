@@ -80,6 +80,7 @@ CLI. It combines live network evidence with CycloneDX software and cryptographic
 - Full command mode, such as `crypton-sweep discover ...`.
 - Slash command mode, such as `/discover ...` and `/dashboard ...`.
 - Built-in command palette with `/help`, `/clear`, and `/exit`.
+- Readline editing, cursor movement, and command history.
 - Digital local-session clock in the terminal workspace.
 - Copilot-style monochrome terminal welcome panel.
 - Interactive startup animation for terminal sessions.

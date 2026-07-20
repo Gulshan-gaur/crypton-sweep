@@ -1,10 +1,13 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
 use clap::{Parser, Subcommand, ValueEnum};
+use rustyline::error::ReadlineError;
+use rustyline::history::DefaultHistory;
+use rustyline::Editor;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::io::{self, BufRead, IsTerminal, Read, Write};
+use std::io::{self, IsTerminal, Read, Write};
 use std::net::{Ipv4Addr, TcpListener, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -433,19 +436,27 @@ fn interactive_shell(no_animation: bool) -> Result<()> {
     }
     print_shell_header();
     println!("  Type a command directly or use a slash command. Type /help for examples.\n");
-    let stdin = io::stdin();
-    let mut lines = stdin.lock().lines();
+    let mut editor =
+        Editor::<(), DefaultHistory>::new().context("failed to initialize terminal line editor")?;
     loop {
-        print!("\x1b[38;5;245mcrypton-sweep\x1b[0m \x1b[38;5;255m>\x1b[0m ");
-        io::stdout().flush().ok();
-        let Some(line) = lines.next() else {
-            break;
-        };
-        let line = line?;
+        let line =
+            match editor.readline("\x1b[38;5;245mcrypton-sweep\x1b[0m \x1b[38;5;255m>\x1b[0m ") {
+                Ok(line) => line,
+                Err(ReadlineError::Interrupted) => {
+                    println!("^C");
+                    continue;
+                }
+                Err(ReadlineError::Eof) => {
+                    println!();
+                    break;
+                }
+                Err(error) => return Err(error.into()),
+            };
         let input = line.trim();
         if input.is_empty() {
             continue;
         }
+        editor.add_history_entry(input)?;
         if matches!(input, "/exit" | "/quit" | "exit" | "quit") {
             println!("Goodbye.");
             break;
