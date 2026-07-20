@@ -75,6 +75,11 @@ CLI. It combines live network evidence with CycloneDX software and cryptographic
 ### CLI and Distribution
 
 - Rust crate and executable CLI.
+- Interactive no-subcommand terminal workspace.
+- Full command mode, such as `crypton-sweep discover ...`.
+- Slash command mode, such as `/discover ...` and `/dashboard ...`.
+- Built-in command palette with `/help`, `/clear`, and `/exit`.
+- Digital local-session clock in the terminal workspace.
 - Copilot-style monochrome terminal welcome panel.
 - Interactive startup animation for terminal sessions.
 - `--no-animation` mode for CI and scripts.

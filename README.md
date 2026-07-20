@@ -82,6 +82,28 @@ The Rust crate performs scanning, parsing, normalization, and HTML generation. T
 only serves the already-generated static report on `127.0.0.1`; it is not part of the scanning or
 cryptographic logic and has no third-party dependency.
 
+## Interactive CLI
+
+Running the binary without a subcommand opens the interactive terminal workspace:
+
+```bash
+crypton-sweep
+```
+
+It shows the Crypton wordmark, subordinate `sweep` label, current digital clock, command prompt,
+and command palette. Both command styles are supported:
+
+```text
+crypton-sweep > discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json
+crypton-sweep > /discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json
+crypton-sweep > /dashboard reports/range.json --out-dir reports
+crypton-sweep > /exit
+```
+
+Available slash commands include `/discover`, `/inventory`, `/report`, `/dashboard`,
+`/export-cyclonedx`, `/help`, `/clear`, and `/exit`. Direct subcommands remain available for
+automation and CI. Use `--no-animation` or `NO_COLOR=1` for plain terminal output.
+
 The scanner runs from the network vantage point where the command is executed. It does not
 magically see services behind a firewall, on another VLAN, bound only to loopback, or on ports
 not included in `--ports`. For a client pilot, run the binary on an approved jump host inside the

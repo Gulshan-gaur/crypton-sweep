@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::io::{self, IsTerminal, Write};
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -287,13 +287,25 @@ struct CycloneDxDependency {
 fn main() -> Result<()> {
     let raw_args: Vec<String> = std::env::args().collect();
     let no_animation = raw_args.iter().skip(1).any(|arg| arg == "--no-animation");
+    let commandless =
+        raw_args.len() == 1 || raw_args.iter().skip(1).all(|arg| arg == "--no-animation");
+    if commandless {
+        if io::stdin().is_terminal() && io::stdout().is_terminal() {
+            return interactive_shell(no_animation);
+        }
+        Cli::parse_from([raw_args[0].clone(), "--help".into()]);
+    }
     let clap_args: Vec<String> = raw_args
         .into_iter()
         .filter(|arg| arg != "--no-animation")
         .collect();
     let cli = Cli::parse_from(clap_args);
     startup_animation(no_animation);
-    match cli.command {
+    run_command(cli.command)
+}
+
+fn run_command(command: CommandKind) -> Result<()> {
+    match command {
         CommandKind::Discover {
             target,
             ports,
@@ -383,6 +395,139 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn interactive_shell(no_animation: bool) -> Result<()> {
+    if !no_animation && std::env::var_os("NO_COLOR").is_none() {
+        for status in [
+            "opening local workspace",
+            "loading cryptographic policy",
+            "ready",
+        ] {
+            print!("\x1b[38;5;245m  · {status:<34}\x1b[0m\r");
+            io::stdout().flush().ok();
+            thread::sleep(Duration::from_millis(120));
+        }
+        println!();
+    }
+    print_shell_header();
+    println!("  Type a command directly or use a slash command. Type /help for examples.\n");
+    let stdin = io::stdin();
+    let mut lines = stdin.lock().lines();
+    loop {
+        print!("\x1b[38;5;245mcrypton-sweep\x1b[0m \x1b[38;5;255m>\x1b[0m ");
+        io::stdout().flush().ok();
+        let Some(line) = lines.next() else {
+            break;
+        };
+        let line = line?;
+        let input = line.trim();
+        if input.is_empty() {
+            continue;
+        }
+        if matches!(input, "/exit" | "/quit" | "exit" | "quit") {
+            println!("Goodbye.");
+            break;
+        }
+        if input == "/clear" {
+            print!("\x1b[2J\x1b[H");
+            print_shell_header();
+            continue;
+        }
+        if input == "/help" || input == "help" {
+            print_shell_help();
+            continue;
+        }
+        let command_args = shell_command_args(input)?;
+        let parsed = match Cli::try_parse_from(
+            std::iter::once("crypton-sweep".to_string()).chain(command_args),
+        ) {
+            Ok(cli) => cli,
+            Err(error) => {
+                println!("{error}");
+                continue;
+            }
+        };
+        if let Err(error) = run_command(parsed.command) {
+            eprintln!("error: {error:#}");
+        }
+    }
+    Ok(())
+}
+
+fn shell_command_args(input: &str) -> Result<Vec<String>> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut quote = None;
+    let mut escaped = false;
+    let command = input.strip_prefix('/').unwrap_or(input);
+    for character in command.chars() {
+        if escaped {
+            current.push(character);
+            escaped = false;
+            continue;
+        }
+        match character {
+            '\\' => escaped = true,
+            '\'' | '"' if quote == Some(character) => quote = None,
+            '\'' | '"' if quote.is_none() => quote = Some(character),
+            character if character.is_whitespace() && quote.is_none() => {
+                if !current.is_empty() {
+                    args.push(std::mem::take(&mut current));
+                }
+            }
+            character => current.push(character),
+        }
+    }
+    if escaped {
+        current.push('\\');
+    }
+    if quote.is_some() {
+        anyhow::bail!("unclosed quote in command");
+    }
+    if !current.is_empty() {
+        args.push(current);
+    }
+    args.retain(|value| value != "--no-animation");
+    if args
+        .first()
+        .is_some_and(|value| value == "crypton-sweep" || value.ends_with("/crypton-sweep"))
+    {
+        args.remove(0);
+    }
+    if args.is_empty() {
+        anyhow::bail!("enter a command after the prompt; use /help for examples");
+    }
+    Ok(args)
+}
+
+fn print_shell_header() {
+    let white = "\x1b[38;5;255m";
+    let muted = "\x1b[38;5;245m";
+    let panel = "\x1b[48;5;235m";
+    let reset = "\x1b[0m";
+    let clock = chrono::Local::now().format("%H:%M:%S");
+    println!("{panel}{white}  ╭────────────────────────────────────────────────────────╮{reset}");
+    for line in [
+        "  ██████╗██████╗ ██╗   ██╗██████╗ ████████╗ ██████╗ ███╗   ██╗",
+        " ██╔════╝██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝██╔═══██╗████╗  ██║",
+        " ██║     ██████╔╝ ╚████╔╝ ██████╔╝   ██║   ██║   ██║██╔██╗ ██║",
+        " ██║     ██╔══██╗  ╚██╔╝  ██╔══██╗   ██║   ██║   ██║██║╚██╗██║",
+        " ╚██████╗██║  ██║   ██║   ██║  ██║   ██║   ╚██████╔╝██║ ╚████║",
+    ] {
+        println!("{panel}{white}{line:<58}{reset}");
+    }
+    println!("{panel}{muted}                         sweep{reset}");
+    println!("{panel}{muted}                  cryptographic exposure intelligence{reset}");
+    println!("{panel}{white}  ├────────────────────────────────────────────────────────┤{reset}");
+    println!("{panel}{muted}  local session                                      {clock}  {reset}");
+    println!("{panel}{white}  ╰────────────────────────────────────────────────────────╯{reset}\n");
+}
+
+fn print_shell_help() {
+    println!(
+        "\nCommands\n  discover ...          Scan authorized network targets\n  inventory <file>      Read a CycloneDX SBOM/CBOM\n  dashboard <file>      Generate the browser report\n  report <file>         Render JSON or HTML output\n  export-cyclonedx ...  Export SBOM, CBOM, or combined BOM\n\nSlash aliases\n  /discover ...  /inventory ...  /dashboard ...  /help  /clear  /exit\n\nExamples\n  /discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json\n  /dashboard reports/range.json --out-dir reports\n"
+    );
 }
 
 fn expand_targets(specs: &[String], max_targets: usize) -> Result<Vec<String>> {
@@ -1321,7 +1466,7 @@ fn startup_animation(disabled: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::{dashboard_path, expand_targets, parse_ports};
+    use super::{dashboard_path, expand_targets, parse_ports, shell_command_args};
     use std::path::PathBuf;
 
     #[test]
@@ -1365,5 +1510,17 @@ mod tests {
     fn dashboard_uses_json_stem() {
         let path = dashboard_path(&"reports/industry-scan.json".into(), &"reports".into()).unwrap();
         assert_eq!(path, PathBuf::from("reports/industry-scan.html"));
+    }
+
+    #[test]
+    fn shell_accepts_slash_and_full_command_forms() {
+        assert_eq!(
+            shell_command_args("/discover --target 192.168.1.1-38 --ports 443").unwrap(),
+            vec!["discover", "--target", "192.168.1.1-38", "--ports", "443"]
+        );
+        assert_eq!(
+            shell_command_args("crypton-sweep dashboard 'reports/a.json'").unwrap(),
+            vec!["dashboard", "reports/a.json"]
+        );
     }
 }
