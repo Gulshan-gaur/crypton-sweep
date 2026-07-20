@@ -32,8 +32,9 @@ git tag -a v0.1.0 -m "Crypton Sweep v0.1.0"
 git push origin v0.1.0
 ```
 
-The tagged-release workflow builds native archives for Linux, macOS, and Windows and attaches them
-to the GitHub Release.
+The tagged-release workflow builds native archives for Linux, Intel macOS, Apple Silicon macOS,
+and Windows and attaches them to the GitHub Release. The Intel macOS job uses the supported
+`macos-15-intel` GitHub-hosted runner and produces the `x86_64-apple-darwin` archive.
 
 ## Release Rules
 

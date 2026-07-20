@@ -1,6 +1,6 @@
 [package]
 name = "crypton-sweep"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Authorized network cipher sweeper and PQC migration report generator"
 license = "Apache-2.0"
