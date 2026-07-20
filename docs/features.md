@@ -71,6 +71,7 @@ CLI. It combines live network evidence with CycloneDX software and cryptographic
 - Inline monochrome Crypton Sweep SVG logo.
 - Browser `Save to PDF` support with print CSS.
 - Local Python server for browser viewing without third-party Python dependencies.
+- Native Rust `serve` command for installed-crate browser viewing without Python.
 
 ### CLI and Distribution
 

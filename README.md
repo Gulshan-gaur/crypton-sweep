@@ -68,13 +68,27 @@ cargo run -- report reports/scan.json --out reports/scan.html
 
 Open `reports/scan.html` locally. The report has no runtime server or external JavaScript dependency.
 
-For the browser workflow, keep one shared report stem:
+For the browser workflow, use the native `serve` command after installation:
 
 ```bash
-# Reads reports/scan.json and creates reports/scan.html
-cargo run -- dashboard reports/scan.json --out-dir reports
+# Generates reports/scan.html and starts the local browser server
+crypton-sweep serve reports/scan.json --out-dir reports
+```
 
-# Starts a local Python server and opens the dashboard in your browser
+The command opens the report at `http://127.0.0.1:8765/scan.html`. Stop it with `Ctrl+C`.
+Use `--no-browser` when running on a remote server:
+
+```bash
+crypton-sweep serve reports/scan.json --out-dir reports --no-browser
+```
+
+The Python server remains available for a source checkout, but it is not required for an installed
+crate. For manual generation without starting a server:
+
+```bash
+crypton-sweep dashboard reports/scan.json --out-dir reports
+
+# Optional source-checkout server
 python3 scripts/serve_report.py --report scan.html
 ```
 
@@ -100,7 +114,7 @@ crypton-sweep > /dashboard reports/range.json --out-dir reports
 crypton-sweep > /exit
 ```
 
-Available slash commands include `/discover`, `/inventory`, `/report`, `/dashboard`,
+Available slash commands include `/discover`, `/inventory`, `/report`, `/dashboard`, `/serve`,
 `/export-cyclonedx`, `/help`, `/clear`, and `/exit`. Direct subcommands remain available for
 automation and CI. Use `--no-animation` or `NO_COLOR=1` for plain terminal output.
 

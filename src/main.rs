@@ -4,8 +4,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
-use std::io::{self, BufRead, IsTerminal, Write};
-use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
+use std::io::{self, BufRead, IsTerminal, Read, Write};
+use std::net::{Ipv4Addr, TcpListener, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -67,6 +67,18 @@ enum CommandKind {
         input: PathBuf,
         #[arg(long, default_value = "reports")]
         out_dir: PathBuf,
+    },
+    /// Generate and serve the dashboard locally in a browser.
+    Serve {
+        input: PathBuf,
+        #[arg(long, default_value = "reports")]
+        out_dir: PathBuf,
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(short, long, default_value_t = 8765)]
+        port: u16,
+        #[arg(long)]
+        no_browser: bool,
     },
     /// Export a normalized scan or inventory report as CycloneDX JSON.
     ExportCyclonedx {
@@ -381,6 +393,15 @@ fn run_command(command: CommandKind) -> Result<()> {
                     .unwrap_or("report.html")
             );
         }
+        CommandKind::Serve {
+            input,
+            out_dir,
+            host,
+            port,
+            no_browser,
+        } => {
+            serve_dashboard(&input, &out_dir, &host, port, !no_browser)?;
+        }
         CommandKind::ExportCyclonedx { input, out, kind } => {
             let report: ScanReport = serde_json::from_slice(&fs::read(&input)?)
                 .with_context(|| format!("invalid Crypton Sweep report {}", input.display()))?;
@@ -507,26 +528,33 @@ fn print_shell_header() {
     let panel = "\x1b[48;5;235m";
     let reset = "\x1b[0m";
     let clock = chrono::Local::now().format("%H:%M:%S");
-    println!("{panel}{white}  ╭────────────────────────────────────────────────────────╮{reset}");
+    println!("{panel}{white}  ╭──────────────────────────────────────────────────────────────────────╮{reset}");
     for line in [
-        "  ██████╗██████╗ ██╗   ██╗██████╗ ████████╗ ██████╗ ███╗   ██╗",
-        " ██╔════╝██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝██╔═══██╗████╗  ██║",
-        " ██║     ██████╔╝ ╚████╔╝ ██████╔╝   ██║   ██║   ██║██╔██╗ ██║",
-        " ██║     ██╔══██╗  ╚██╔╝  ██╔══██╗   ██║   ██║   ██║██║╚██╗██║",
-        " ╚██████╗██║  ██║   ██║   ██║  ██║   ██║   ╚██████╔╝██║ ╚████║",
+        " ██████╗  ██████╗ ██╗   ██╗ ██████╗ ████████╗ ██████╗ ███╗   ██╗",
+        "██╔════╝ ██╔══██╗╚██╗ ██╔╝██╔══██╗╚══██╔══╝██╔═══██╗████╗  ██║",
+        "██║      ██████╔╝ ╚████╔╝ ██████╔╝   ██║   ██║   ██║██╔██╗ ██║",
+        "██║      ██╔══██╗  ╚██╔╝  ██╔══██╗   ██║   ██║   ██║██║╚██╗██║",
+        "╚██████╗ ██║  ██║   ██║   ██║  ██║   ██║   ╚██████╔╝██║ ╚████║",
+        " ╚═════╝ ╚═╝  ╚═╝   ╚═╝   ╚═╝  ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝",
     ] {
-        println!("{panel}{white}{line:<58}{reset}");
+        println!("{panel}{white}  │{line:<70}│{reset}");
     }
-    println!("{panel}{muted}                         sweep{reset}");
-    println!("{panel}{muted}                  cryptographic exposure intelligence{reset}");
-    println!("{panel}{white}  ├────────────────────────────────────────────────────────┤{reset}");
-    println!("{panel}{muted}  local session                                      {clock}  {reset}");
-    println!("{panel}{white}  ╰────────────────────────────────────────────────────────╯{reset}\n");
+    println!(
+        "{panel}{muted}  │                              sweep                         │{reset}"
+    );
+    println!(
+        "{panel}{muted}  │                    cryptographic exposure intelligence     │{reset}"
+    );
+    println!("{panel}{white}  ├──────────────────────────────────────────────────────────────────────┤{reset}");
+    println!(
+        "{panel}{muted}  │  local session                                      {clock}  │{reset}"
+    );
+    println!("{panel}{white}  ╰──────────────────────────────────────────────────────────────────────╯{reset}\n");
 }
 
 fn print_shell_help() {
     println!(
-        "\nCommands\n  discover ...          Scan authorized network targets\n  inventory <file>      Read a CycloneDX SBOM/CBOM\n  dashboard <file>      Generate the browser report\n  report <file>         Render JSON or HTML output\n  export-cyclonedx ...  Export SBOM, CBOM, or combined BOM\n\nSlash aliases\n  /discover ...  /inventory ...  /dashboard ...  /help  /clear  /exit\n\nExamples\n  /discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json\n  /dashboard reports/range.json --out-dir reports\n"
+        "\nCommands\n  discover ...          Scan authorized network targets\n  inventory <file>      Read a CycloneDX SBOM/CBOM\n  dashboard <file>      Generate the browser report\n  serve <file>          Generate and open the report locally\n  report <file>         Render JSON or HTML output\n  export-cyclonedx ...  Export SBOM, CBOM, or combined BOM\n\nSlash aliases\n  /discover ...  /inventory ...  /dashboard ...  /serve ...\n  /report ...    /export-cyclonedx ...  /help  /clear  /exit\n\nExamples\n  /discover --target 192.168.1.1-38 --ports 443,1883 --tls --out reports/range.json\n  /serve reports/range.json --out-dir reports\n"
     );
 }
 
@@ -1416,6 +1444,102 @@ fn render_html(report: &ScanReport) -> String {
             "__CRYPTON_LOGO_SVG__",
             include_str!("../assets/crypton-sweep-logo.svg"),
         )
+}
+
+fn serve_dashboard(
+    input: &PathBuf,
+    out_dir: &PathBuf,
+    host: &str,
+    port: u16,
+    open_browser: bool,
+) -> Result<()> {
+    let report: ScanReport = serde_json::from_slice(&fs::read(input)?)
+        .with_context(|| format!("invalid scan report {}", input.display()))?;
+    let output = dashboard_path(input, out_dir)?;
+    fs::create_dir_all(out_dir)?;
+    fs::write(&output, render_html(&report))?;
+
+    let listener = TcpListener::bind((host, port))
+        .with_context(|| format!("failed to bind dashboard server {host}:{port}"))?;
+    let actual_port = listener.local_addr()?.port();
+    let file_name = output
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("report.html")
+        .to_string();
+    let url = format!("http://{host}:{actual_port}/{file_name}");
+    println!("[crypton-sweep] dashboard generated: {}", output.display());
+    println!("[crypton-sweep] serving at {url}");
+    println!("[crypton-sweep] press Ctrl+C to stop");
+
+    if open_browser {
+        open_browser_url(&url);
+    }
+    for connection in listener.incoming() {
+        match connection {
+            Ok(stream) => {
+                if let Err(error) = serve_http_connection(stream, &file_name, &output) {
+                    eprintln!("[crypton-sweep] browser request failed: {error}");
+                }
+            }
+            Err(error) => eprintln!("[crypton-sweep] server connection failed: {error}"),
+        }
+    }
+    Ok(())
+}
+
+fn serve_http_connection(mut stream: TcpStream, file_name: &str, output: &PathBuf) -> Result<()> {
+    let mut request = [0u8; 8192];
+    let bytes_read = stream.read(&mut request)?;
+    let request = String::from_utf8_lossy(&request[..bytes_read]);
+    let request_path = request
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or("/");
+    let expected_path = format!("/{file_name}");
+    let body = if request_path == "/" || request_path == expected_path {
+        fs::read(output)?
+    } else {
+        let body = b"Not found".to_vec();
+        write_http_response(&mut stream, "404 Not Found", "text/plain", &body)?;
+        return Ok(());
+    };
+    write_http_response(&mut stream, "200 OK", "text/html; charset=utf-8", &body)
+}
+
+fn write_http_response(
+    stream: &mut TcpStream,
+    status: &str,
+    content_type: &str,
+    body: &[u8],
+) -> Result<()> {
+    let headers = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {content_type}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        body.len()
+    );
+    stream.write_all(headers.as_bytes())?;
+    stream.write_all(body)?;
+    stream.flush()?;
+    Ok(())
+}
+
+fn open_browser_url(url: &str) {
+    let command = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        "cmd"
+    } else {
+        "xdg-open"
+    };
+    let result = if cfg!(target_os = "windows") {
+        Command::new(command).args(["/C", "start", "", url]).spawn()
+    } else {
+        Command::new(command).arg(url).spawn()
+    };
+    if result.is_err() {
+        println!("[crypton-sweep] open this URL manually: {url}");
+    }
 }
 
 fn startup_animation(disabled: bool) {
