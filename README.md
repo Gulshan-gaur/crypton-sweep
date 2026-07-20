@@ -36,6 +36,8 @@ src/main.rs                  Rust CLI, scanner, inventory, exporter
 templates/report.html        Offline report dashboard template
 scripts/serve_report.py      Local-only static dashboard server
 scripts/install.sh           Unix release installer
+assets/terminal.png          Interactive CLI preview
+assets/report.png            HTML report preview
 examples/                    Sample CycloneDX input
 docs/features.md             Implemented and planned feature reference
 docs/                        Architecture and release documentation
@@ -58,6 +60,43 @@ NO_COLOR=1 crypton-sweep report reports/scan.json --out reports/scan.html
 The HTML report contains an inline Crypton Sweep SVG mark and an `Export PDF` action. Select
 that action in a browser and choose **Save to PDF**; no external logo or network connection is
 required.
+
+## End-to-End Workflow
+
+The normal client workflow is:
+
+1. Install or update the CLI.
+2. Run an authorized network discovery or import a CycloneDX SBOM/CBOM.
+3. Generate the JSON evidence report and HTML dashboard.
+4. Serve the dashboard locally in a browser.
+5. Export normalized evidence to CycloneDX when required.
+
+```bash
+# 1. Install or update the CLI from GitHub
+cargo install --git https://github.com/Gulshan-gaur/crypton-sweep.git \
+  --branch main --locked --force
+
+# 2. Discover approved hosts and services
+crypton-sweep discover \
+  --target 192.168.1.10-192.168.1.38 \
+  --ports 22,80,443,1883,8883,8443 \
+  --tls \
+  --out reports/network.json
+
+# 3. Generate the self-contained HTML report
+crypton-sweep report reports/network.json --out reports/network.html
+
+# 4. Serve the report and open it in a browser
+crypton-sweep serve reports/network.json --out-dir reports
+
+# 5. Optional: export the evidence as CycloneDX
+crypton-sweep export-cyclonedx reports/network.json \
+  --kind combined --out reports/network.cdx.json
+```
+
+The report server listens on `127.0.0.1:8765` by default and stops with `Ctrl+C`. Use
+`--host 0.0.0.0` only when the report must be reachable from another authorized machine, and
+use `--no-browser` on a headless host. The installed CLI does not require Python to serve reports.
 
 ## Quick Start
 
@@ -133,6 +172,18 @@ crypton-sweep serve reports/scan.json --out-dir reports
 ```
 
 The browser opens at `http://127.0.0.1:8765/scan.html`. Stop the server with `Ctrl+C` in Terminal 2.
+
+## What It Looks Like
+
+The interactive workspace provides both full subcommands and slash commands. Cursor movement,
+command history, and the current session clock are available directly in the prompt:
+
+![Crypton Sweep interactive terminal](assets/terminal.png)
+
+The generated HTML report is self-contained and includes the exposure profile, cryptographic
+knowledge graph, risk findings, migration posture, asset inventory, and PDF export:
+
+![Crypton Sweep HTML exposure report](assets/report.png)
 
 The scanner runs from the network vantage point where the command is executed. It does not
 magically see services behind a firewall, on another VLAN, bound only to loopback, or on ports
