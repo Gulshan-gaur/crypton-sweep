@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
+use std::io::{self, IsTerminal, Write};
 use std::net::{Ipv4Addr, TcpStream, ToSocketAddrs};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -18,7 +19,8 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[command(
     name = "crypton-sweep",
     version,
-    about = "Authorized network cipher sweeper and PQC migration report generator"
+    about = "Authorized network cipher sweeper and PQC migration report generator",
+    after_help = "Global option: --no-animation disables the interactive startup sequence."
 )]
 struct Cli {
     #[command(subcommand)]
@@ -283,7 +285,15 @@ struct CycloneDxDependency {
 }
 
 fn main() -> Result<()> {
-    match Cli::parse().command {
+    let raw_args: Vec<String> = std::env::args().collect();
+    let no_animation = raw_args.iter().skip(1).any(|arg| arg == "--no-animation");
+    let clap_args: Vec<String> = raw_args
+        .into_iter()
+        .filter(|arg| arg != "--no-animation")
+        .collect();
+    let cli = Cli::parse_from(clap_args);
+    startup_animation(no_animation);
+    match cli.command {
         CommandKind::Discover {
             target,
             ports,
@@ -1255,7 +1265,58 @@ fn write_json(path: &PathBuf, report: &ScanReport) -> Result<()> {
 
 fn render_html(report: &ScanReport) -> String {
     let json = serde_json::to_string(report).expect("report is serializable");
-    include_str!("../templates/report.html").replace("__REPORT_JSON__", &json)
+    include_str!("../templates/report.html")
+        .replace("__REPORT_JSON__", &json)
+        .replace(
+            "__CRYPTON_LOGO_SVG__",
+            include_str!("../assets/crypton-sweep-logo.svg"),
+        )
+}
+
+fn startup_animation(disabled: bool) {
+    if disabled || std::env::var_os("NO_COLOR").is_some() || !io::stdout().is_terminal() {
+        println!("Crypton Sweep v{VERSION} | PQC exposure intelligence");
+        return;
+    }
+
+    let white = "\x1b[38;5;255m";
+    let muted = "\x1b[38;5;245m";
+    let panel = "\x1b[48;5;235m";
+    let reset = "\x1b[0m";
+    let logo = [
+        "             /\\             ",
+        "        ____/  \\____        ",
+        "       /    \\  /    \\       ",
+        "       \\____/\\/____/       ",
+        "       /    /  \\    \\       ",
+        "       \\___/____\\___/       ",
+        "           \\____/           ",
+    ];
+
+    print!("\x1b[?25l\n{panel}");
+    println!("{white}  ╭────────────────────────────────────────────────╮{reset}");
+    for line in logo {
+        println!("{panel}{white}  │              {line}              │{reset}");
+    }
+    println!("{panel}{white}  │   C R Y P T O N   S W E E P                    │{reset}");
+    println!("{panel}{muted}  │   post-quantum exposure intelligence             │{reset}");
+    println!("{panel}{white}  ├────────────────────────────────────────────────┤{reset}");
+
+    let frames = [
+        ("◐", "initializing evidence engine"),
+        ("◓", "loading cryptographic policy"),
+        ("◑", "arming network observability"),
+        ("◒", "preparing migration workspace"),
+    ];
+    for (spinner, message) in frames {
+        print!("{panel}{white}  │   {spinner} {muted}{message:<42}{white}│{reset}\r");
+        io::stdout().flush().ok();
+        thread::sleep(Duration::from_millis(110));
+    }
+    println!("{panel}{white}  │   ✓ {white}ready{muted}  ·  authorized local analysis       {white}│{reset}");
+    println!(
+        "{white}  ╰────────────────────────────────────────────────╯{reset}\n{reset}\x1b[?25h"
+    );
 }
 
 #[cfg(test)]
