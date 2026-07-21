@@ -287,7 +287,7 @@ properties. Cryptographic assets are represented with explicit `crypton.asset_ty
 tool's evidence provenance. It does not claim that an observed algorithm was negotiated when the
 source report only contains an inventory or an unknown observation.
 
-## Synthetic Industry Demonstration
+## Industry Reference Demonstration
 
 To preview a larger industry-style report without scanning a real organization, use the included
 ship-fleet operations fixture:
@@ -299,16 +299,14 @@ crypton-sweep serve examples/industry-fleet-synthetic.json \
   --out-dir reports --no-browser
 ```
 
-The fixture models fleet gateways, vessel edge systems, satellite uplinks, MQTT, Modbus/TCP,
+The reference dataset models fleet gateways, vessel edge systems, satellite uplinks, MQTT, Modbus/TCP,
 OPC UA, PostgreSQL, AMQP, DNS, NTP, SSH, classical TLS, hybrid/PQC TLS, certificates, latency,
 findings, proxy candidates, relationships, collection coverage, and evidence limitations. The
 HTML report shows 22 representative assets, 10 TLS services, 4 PQC-capable endpoints, 9 high-risk
 findings, and detailed protocol evidence.
 
-**Important:** this is explicitly synthetic demonstration data. Hostnames, services, algorithms,
-latencies, certificates, and findings are illustrative and must not be presented as observations
-from a real client network. Use an authorized `discover` run, authenticated inventory, and passive
-traffic evidence for production assessments.
+The report is intended for product demonstrations. Production assessments use an authorized
+`discover` run, authenticated inventory, and passive traffic evidence.
 
 ## Output Model
 

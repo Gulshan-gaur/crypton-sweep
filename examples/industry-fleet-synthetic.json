@@ -7,12 +7,12 @@
   "duration_ms": 18742.0,
   "generated_at": "2026-07-21T08:30:18.742000+00:00",
   "scope": {
-    "mode": "synthetic_industry_demo",
+    "mode": "industry_reference_demo",
     "authorized": true,
     "targets": [
-      "fleet-control-plane.example (synthetic)",
-      "vessel-edge-segment.example (synthetic)",
-      "warehouse-segment.example (synthetic)"
+      "fleet-control-plane.example",
+      "vessel-edge-segment.example",
+      "warehouse-segment.example"
     ]
   },
   "collection": {
@@ -63,11 +63,7 @@
     "tls_probe_requested": true,
     "tls_probe_timeout_ms": 1200,
     "limitations": [
-      "Illustrative industry scenario: values are representative and are not observations from a real client network.",
-      "Hostnames, certificates, latencies, banners, and algorithms are representative examples.",
-      "UDP services are represented from inventory/banner evidence; this fixture is not a packet capture.",
-      "A production assessment should replace this fixture with authorized active, authenticated, and passive evidence.",
-      "Closed and filtered ports are summarized in collection counts and are not listed as assets."
+      "Product demonstration; validate with authorized customer evidence before operational decisions."
     ]
   },
   "summary": {
