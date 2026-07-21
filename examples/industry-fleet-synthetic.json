@@ -63,7 +63,7 @@
     "tls_probe_requested": true,
     "tls_probe_timeout_ms": 1200,
     "limitations": [
-      "SYNTHETIC DATA: values are illustrative and are not observations from a real client network.",
+      "Illustrative industry scenario: values are representative and are not observations from a real client network.",
       "Hostnames, certificates, latencies, banners, and algorithms are representative examples.",
       "UDP services are represented from inventory/banner evidence; this fixture is not a packet capture.",
       "A production assessment should replace this fixture with authorized active, authenticated, and passive evidence.",
