@@ -2,7 +2,6 @@
 
 Crypton Sweep is an open-source, authorized **network cipher sweeper** and PQC migration report generator. It discovers reachable services, records cryptographic signals, imports CycloneDX inventories, and creates a self-contained HTML report with risk posture, migration actions, and a cryptographic knowledge graph.
 
-It is intentionally separate from Crypton's proprietary protocol and proxy implementation.
 
 ## Install
 
