@@ -1,0 +1,1783 @@
+{
+  "scan_id": "synthetic-fleet-demo-20260721",
+  "schema_version": "crypton-sweep/v1",
+  "tool": "crypton-sweep/0.1.1",
+  "started_at": "2026-07-21T08:30:00+00:00",
+  "completed_at": "2026-07-21T08:30:18.742000+00:00",
+  "duration_ms": 18742.0,
+  "generated_at": "2026-07-21T08:30:18.742000+00:00",
+  "scope": {
+    "mode": "synthetic_industry_demo",
+    "authorized": true,
+    "targets": [
+      "fleet-control-plane.example (synthetic)",
+      "vessel-edge-segment.example (synthetic)",
+      "warehouse-segment.example (synthetic)"
+    ]
+  },
+  "collection": {
+    "method": "simulated active TCP + TLS + service inventory correlation",
+    "port_spec": "1-65535 (representative sample)",
+    "attempted_ports": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      22,
+      53,
+      80,
+      123,
+      161,
+      443,
+      502,
+      5432,
+      5671,
+      6379,
+      8443,
+      8883,
+      15672,
+      1883,
+      4840,
+      7878
+    ],
+    "attempted_port_count": 2560,
+    "reachable_port_count": 22,
+    "worker_count": 64,
+    "timeout_ms": 300,
+    "tls_probe_requested": true,
+    "tls_probe_timeout_ms": 1200,
+    "limitations": [
+      "SYNTHETIC DATA: values are illustrative and are not observations from a real client network.",
+      "Hostnames, certificates, latencies, banners, and algorithms are representative examples.",
+      "UDP services are represented from inventory/banner evidence; this fixture is not a packet capture.",
+      "A production assessment should replace this fixture with authorized active, authenticated, and passive evidence.",
+      "Closed and filtered ports are summarized in collection counts and are not listed as assets."
+    ]
+  },
+  "summary": {
+    "assets": 22,
+    "services": 22,
+    "reachable": 22,
+    "tls_services": 10,
+    "pqc_ready": 4,
+    "classical_only": 11,
+    "high_risk": 9,
+    "proxy_candidates": 11,
+    "certificates_expiring_soon": 2
+  },
+  "assets": [
+    {
+      "id": "fleet-gw-01:443",
+      "host": "fleet-gw-01",
+      "port": 443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 3.8,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 3.8,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.2,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519",
+        "signature_algorithm": "RSA-PSS+SHA256",
+        "certificate_algorithm": "RSA",
+        "certificate_key_bits": 2048,
+        "certificate_expires": "2026-11-15",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "RSA-2048",
+          "ECDHE",
+          "AES-256-GCM"
+        ],
+        "key_bits": [
+          2048
+        ],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 72,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "TLS-001",
+          "severity": "high",
+          "title": "Classical certificate key exchange",
+          "detail": "RSA-2048 certificate and X25519 key exchange are quantum-vulnerable for long-lived confidentiality."
+        }
+      ],
+      "recommendation": "Route through a PQC-capable proxy and plan certificate migration."
+    },
+    {
+      "id": "fleet-gw-01:1883",
+      "host": "fleet-gw-01",
+      "port": 1883,
+      "service": "MQTT",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 1.9,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 1.9,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "MQTT",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "active_tcp_probe"
+      },
+      "risk": {
+        "score": 90,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "MQTT-001",
+          "severity": "high",
+          "title": "Plain MQTT listener",
+          "detail": "Telemetry is reachable without observed transport encryption or peer authentication."
+        }
+      ],
+      "recommendation": "Place a proxy in front of the broker, then migrate devices to authenticated encrypted transport."
+    },
+    {
+      "id": "fleet-gw-01:8883",
+      "host": "fleet-gw-01",
+      "port": 8883,
+      "service": "MQTT over TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 4.4,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.4,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.800000000000001,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "MQTT over TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_128_GCM_SHA256",
+        "key_exchange": "X25519",
+        "signature_algorithm": "ECDSA+SHA256",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2027-02-12",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_128_GCM_SHA256"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ECDSA-P256",
+          "ECDHE",
+          "AES-128-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 58,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "PQC-001",
+          "severity": "medium",
+          "title": "Classical TLS profile",
+          "detail": "The endpoint is encrypted but no PQC or hybrid group was observed."
+        }
+      ],
+      "recommendation": "Retain service availability while piloting hybrid TLS/PQC at the gateway."
+    },
+    {
+      "id": "fleet-gw-01:22",
+      "host": "fleet-gw-01",
+      "port": 22,
+      "service": "SSH",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 2.2,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 2.2,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "SSH",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "RSA-2048",
+          "Ed25519",
+          "ChaCha20-Poly1305"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": true,
+        "evidence": "banner + policy probe"
+      },
+      "risk": {
+        "score": 61,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "SSH-001",
+          "severity": "medium",
+          "title": "Classical SSH host key",
+          "detail": "RSA host-key material remains in the administrative path."
+        }
+      ],
+      "recommendation": "Prefer hybrid-capable SSH policy when supported and rotate legacy host keys."
+    },
+    {
+      "id": "sat-uplink-01:443",
+      "host": "sat-uplink-01",
+      "port": 443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 121.6,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 121.6,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 122.0,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519MLKEM768",
+        "signature_algorithm": "ECDSA+SHA256",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2028-08-01",
+        "pqc_group": "X25519MLKEM768",
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ML-KEM-768",
+          "ECDSA-P256",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": true,
+        "hybrid_supported": true,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "openssl + PQC provider"
+      },
+      "risk": {
+        "score": 26,
+        "level": "low"
+      },
+      "findings": [
+        {
+          "code": "PQC-READY-001",
+          "severity": "low",
+          "title": "PQC-capable endpoint",
+          "detail": "A PQC group was observed, but certificate authentication remains classical."
+        }
+      ],
+      "recommendation": "Track as a PQC-capable asset and validate certificate migration separately."
+    },
+    {
+      "id": "sat-uplink-01:7878",
+      "host": "sat-uplink-01",
+      "port": 7878,
+      "service": "Secure telemetry channel",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 126.4,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 126.4,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "Secure telemetry channel",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "ML-KEM-768",
+          "Falcon-512",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": true,
+        "hybrid_supported": true,
+        "quantum_vulnerable": false,
+        "encryption_observed": false,
+        "evidence": "protocol banner + authenticated probe"
+      },
+      "risk": {
+        "score": 18,
+        "level": "low"
+      },
+      "findings": [
+        {
+          "code": "PQC-READY-001",
+          "severity": "low",
+          "title": "PQC-capable endpoint",
+          "detail": "The secure channel advertises a post-quantum KEM and signature profile."
+        }
+      ],
+      "recommendation": "Maintain key rotation and replay telemetry; include in interoperability regression tests."
+    },
+    {
+      "id": "vessel-telemetry-01:1883",
+      "host": "vessel-telemetry-01",
+      "port": 1883,
+      "service": "MQTT",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 148.2,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 148.2,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "MQTT",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "active_tcp_probe"
+      },
+      "risk": {
+        "score": 94,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "MQTT-001",
+          "severity": "high",
+          "title": "Plain MQTT listener",
+          "detail": "Legacy vessel telemetry is exposed without observed encryption."
+        },
+        {
+          "code": "BROWNFIELD-001",
+          "severity": "high",
+          "title": "Brownfield proxy candidate",
+          "detail": "The service is a candidate for protection without immediate firmware replacement."
+        }
+      ],
+      "recommendation": "Deploy a local software/hardware proxy and preserve the existing device-facing MQTT contract."
+    },
+    {
+      "id": "vessel-telemetry-01:8883",
+      "host": "vessel-telemetry-01",
+      "port": 8883,
+      "service": "MQTT over TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 149.5,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 149.5,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 149.9,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "MQTT over TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519",
+        "signature_algorithm": "RSA-PSS+SHA256",
+        "certificate_algorithm": "RSA",
+        "certificate_key_bits": 2048,
+        "certificate_expires": "2026-10-30",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "RSA-2048",
+          "ECDHE",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 68,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "TLS-001",
+          "severity": "high",
+          "title": "Classical certificate key exchange",
+          "detail": "The service uses RSA-2048 certificate authentication and no PQC signal was observed."
+        }
+      ],
+      "recommendation": "Use proxy termination during staged firmware migration; prioritize high-value telemetry topics."
+    },
+    {
+      "id": "vessel-edge-02:502",
+      "host": "vessel-edge-02",
+      "port": 502,
+      "service": "Modbus/TCP",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 151.3,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 151.3,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "Modbus/TCP",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "well-known port + banner"
+      },
+      "risk": {
+        "score": 88,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "OT-001",
+          "severity": "high",
+          "title": "Industrial protocol without transport security",
+          "detail": "Modbus/TCP is reachable without an observed cryptographic protection layer."
+        }
+      ],
+      "recommendation": "Isolate the segment and place an authenticated proxy at the vessel gateway."
+    },
+    {
+      "id": "vessel-edge-02:4840",
+      "host": "vessel-edge-02",
+      "port": 4840,
+      "service": "OPC UA",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 153.1,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 153.1,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "OPC UA",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "RSA-2048",
+          "SHA-256"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "well-known port + banner"
+      },
+      "risk": {
+        "score": 64,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "CERT-001",
+          "severity": "medium",
+          "title": "Legacy OPC UA certificate",
+          "detail": "The service exposes classical certificate material requiring migration planning."
+        }
+      ],
+      "recommendation": "Inventory certificate dependencies and pilot a PQC-capable gateway policy."
+    },
+    {
+      "id": "fleet-api-01:8443",
+      "host": "fleet-api-01",
+      "port": 8443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 7.1,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 7.1,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 7.5,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519MLKEM768",
+        "signature_algorithm": "ML-DSA-65",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2028-12-19",
+        "pqc_group": "X25519MLKEM768",
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ML-KEM-768",
+          "ML-DSA-65",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": true,
+        "hybrid_supported": true,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "openssl + PQC provider"
+      },
+      "risk": {
+        "score": 12,
+        "level": "low"
+      },
+      "findings": [
+        {
+          "code": "PQC-READY-001",
+          "severity": "low",
+          "title": "Hybrid TLS endpoint",
+          "detail": "A hybrid PQC key exchange and signature signal were observed."
+        }
+      ],
+      "recommendation": "Use as the reference PQC baseline and compare brownfield assets against it."
+    },
+    {
+      "id": "fleet-api-01:5432",
+      "host": "fleet-api-01",
+      "port": 5432,
+      "service": "PostgreSQL",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 6.2,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 6.2,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "PostgreSQL",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "SCRAM-SHA-256"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": false,
+        "evidence": "active_tcp_probe"
+      },
+      "risk": {
+        "score": 43,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "DB-001",
+          "severity": "medium",
+          "title": "Database transport not characterized",
+          "detail": "A database listener is reachable but TLS negotiation was not performed by this scan profile."
+        }
+      ],
+      "recommendation": "Run an authenticated database configuration check and verify TLS enforcement."
+    },
+    {
+      "id": "ops-broker-01:5671",
+      "host": "ops-broker-01",
+      "port": 5671,
+      "service": "AMQP over TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 5.5,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 5.5,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 5.9,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "AMQP over TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519",
+        "signature_algorithm": "ECDSA+SHA256",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2027-09-03",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ECDSA-P256",
+          "ECDHE",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 39,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "PQC-001",
+          "severity": "medium",
+          "title": "Classical AMQP TLS profile",
+          "detail": "Encrypted messaging is present but no PQC signal was observed."
+        }
+      ],
+      "recommendation": "Assess client compatibility and introduce a hybrid-capable broker endpoint."
+    },
+    {
+      "id": "ops-broker-01:15672",
+      "host": "ops-broker-01",
+      "port": 15672,
+      "service": "HTTP management",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 5.0,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 5.0,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTP management",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "well-known port + banner"
+      },
+      "risk": {
+        "score": 77,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "ADMIN-001",
+          "severity": "high",
+          "title": "Management interface exposed",
+          "detail": "A management interface is reachable in the assessed network scope."
+        }
+      ],
+      "recommendation": "Restrict management access and require authenticated encrypted transport."
+    },
+    {
+      "id": "fleet-db-01:5432",
+      "host": "fleet-db-01",
+      "port": 5432,
+      "service": "PostgreSQL",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 4.6,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.6,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 5.0,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "PostgreSQL",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519",
+        "signature_algorithm": "ECDSA+SHA256",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2027-05-20",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ECDHE",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 34,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "TLS-002",
+          "severity": "medium",
+          "title": "Database TLS certificate unclassified",
+          "detail": "Encrypted transport was observed but certificate and key ownership need inventory confirmation."
+        }
+      ],
+      "recommendation": "Collect certificate metadata and bind database ownership to the migration plan."
+    },
+    {
+      "id": "monitoring-01:443",
+      "host": "monitoring-01",
+      "port": 443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 4.0,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.0,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 4.4,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_128_GCM_SHA256",
+        "key_exchange": "X25519",
+        "signature_algorithm": "ECDSA+SHA256",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2026-09-14",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_128_GCM_SHA256"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ECDSA-P256",
+          "ECDHE",
+          "AES-128-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 47,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "CERT-EXP-001",
+          "severity": "medium",
+          "title": "Certificate expires soon",
+          "detail": "The observed certificate expires within the operational renewal window."
+        }
+      ],
+      "recommendation": "Renew the certificate and include PQC/hybrid capability in the renewal design."
+    },
+    {
+      "id": "branch-router-01:161",
+      "host": "branch-router-01",
+      "port": 161,
+      "service": "SNMP",
+      "protocol": "UDP",
+      "reachable": true,
+      "latency_ms": 2.8,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 2.8,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "SNMP",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "HMAC-SHA1"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "service banner + policy inventory"
+      },
+      "risk": {
+        "score": 73,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "NET-001",
+          "severity": "high",
+          "title": "Legacy management protocol",
+          "detail": "SNMP management evidence indicates a classical authentication profile."
+        }
+      ],
+      "recommendation": "Restrict the management plane and migrate to SNMPv3 with modern cryptographic policy."
+    },
+    {
+      "id": "branch-router-01:53",
+      "host": "branch-router-01",
+      "port": 53,
+      "service": "DNS",
+      "protocol": "UDP",
+      "reachable": true,
+      "latency_ms": 1.2,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 1.2,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "DNS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "DNSSEC-SHA256"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": false,
+        "evidence": "service banner"
+      },
+      "risk": {
+        "score": 22,
+        "level": "low"
+      },
+      "findings": [
+        {
+          "code": "DNS-001",
+          "severity": "low",
+          "title": "DNS crypto signal",
+          "detail": "DNSSEC signing signal was observed; transport privacy was not assessed."
+        }
+      ],
+      "recommendation": "Retain DNSSEC and assess resolver transport separately."
+    },
+    {
+      "id": "fleet-time-01:123",
+      "host": "fleet-time-01",
+      "port": 123,
+      "service": "NTP",
+      "protocol": "UDP",
+      "reachable": true,
+      "latency_ms": 1.4,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 1.4,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "NTP",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [
+          "NTP-MAC-MD5"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "service banner + packet metadata"
+      },
+      "risk": {
+        "score": 79,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "NTP-001",
+          "severity": "high",
+          "title": "Legacy NTP authentication",
+          "detail": "An obsolete NTP authentication signal was observed."
+        }
+      ],
+      "recommendation": "Replace legacy NTP authentication and restrict time-service reachability."
+    },
+    {
+      "id": "warehouse-gw-01:443",
+      "host": "warehouse-gw-01",
+      "port": 443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 9.7,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 9.7,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 10.1,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519",
+        "signature_algorithm": "RSA-PSS+SHA384",
+        "certificate_algorithm": "RSA",
+        "certificate_key_bits": 3072,
+        "certificate_expires": "2027-12-07",
+        "pqc_group": null,
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "RSA-3072",
+          "ECDHE",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "active_network_probe"
+      },
+      "risk": {
+        "score": 55,
+        "level": "medium"
+      },
+      "findings": [
+        {
+          "code": "PQC-001",
+          "severity": "medium",
+          "title": "Classical TLS profile",
+          "detail": "The endpoint is encrypted but no PQC or hybrid group was observed."
+        }
+      ],
+      "recommendation": "Prioritize for hybrid TLS pilot after fleet gateway validation."
+    },
+    {
+      "id": "warehouse-gw-01:1883",
+      "host": "warehouse-gw-01",
+      "port": 1883,
+      "service": "MQTT",
+      "protocol": "TCP",
+      "reachable": true,
+      "latency_ms": 8.8,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 8.8,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": false,
+        "outcome": "not_requested",
+        "duration_ms": null,
+        "tool": null,
+        "error": null
+      },
+      "service_detection": {
+        "name": "MQTT",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": null,
+      "crypto": {
+        "algorithms": [],
+        "key_bits": [],
+        "pqc_supported": false,
+        "hybrid_supported": false,
+        "quantum_vulnerable": true,
+        "encryption_observed": false,
+        "evidence": "active_tcp_probe"
+      },
+      "risk": {
+        "score": 91,
+        "level": "high"
+      },
+      "findings": [
+        {
+          "code": "MQTT-001",
+          "severity": "high",
+          "title": "Plain MQTT listener",
+          "detail": "Warehouse telemetry is reachable without observed transport encryption."
+        }
+      ],
+      "recommendation": "Protect with a proxy and migrate device credentials and topics in phases."
+    },
+    {
+      "id": "backup-01:443",
+      "host": "backup-01",
+      "port": 443,
+      "service": "HTTPS/TLS",
+      "protocol": "TCP/TLS",
+      "reachable": true,
+      "latency_ms": 11.5,
+      "connection": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 11.5,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "tls_probe": {
+        "attempted": true,
+        "outcome": "connected",
+        "duration_ms": 11.9,
+        "tool": "crypton-sweep/0.1.1",
+        "error": null
+      },
+      "service_detection": {
+        "name": "HTTPS/TLS",
+        "method": "well-known-port + banner",
+        "confidence": "high",
+        "banner_observed": true
+      },
+      "tls": {
+        "version": "TLSv1.3",
+        "cipher": "TLS_AES_256_GCM_SHA384",
+        "key_exchange": "X25519MLKEM768",
+        "signature_algorithm": "Falcon-512",
+        "certificate_algorithm": "EC",
+        "certificate_key_bits": 256,
+        "certificate_expires": "2029-01-09",
+        "pqc_group": "X25519MLKEM768",
+        "raw_evidence": [
+          "openssl s_client -connect target",
+          "Negotiated TLSv1.3 TLS_AES_256_GCM_SHA384"
+        ]
+      },
+      "crypto": {
+        "algorithms": [
+          "ML-KEM-768",
+          "Falcon-512",
+          "AES-256-GCM"
+        ],
+        "key_bits": [],
+        "pqc_supported": true,
+        "hybrid_supported": true,
+        "quantum_vulnerable": false,
+        "encryption_observed": true,
+        "evidence": "openssl + PQC provider"
+      },
+      "risk": {
+        "score": 15,
+        "level": "low"
+      },
+      "findings": [
+        {
+          "code": "PQC-READY-001",
+          "severity": "low",
+          "title": "PQC-capable endpoint",
+          "detail": "A PQC-capable hybrid profile was observed."
+        }
+      ],
+      "recommendation": "Use as a controlled interoperability reference for recovery workflows."
+    }
+  ],
+  "relationships": [
+    {
+      "source": "fleet-gw-01:443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-gw-01:443",
+      "target": "algorithm:RSA-2048",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:443",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:443",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:1883",
+      "target": "service:MQTT",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-gw-01:1883",
+      "target": "evidence:active_tcp_probe",
+      "kind": "evidence"
+    },
+    {
+      "source": "fleet-gw-01:8883",
+      "target": "service:MQTT over TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-gw-01:8883",
+      "target": "algorithm:ECDSA-P256",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:8883",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:8883",
+      "target": "algorithm:AES-128-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:22",
+      "target": "service:SSH",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-gw-01:22",
+      "target": "algorithm:RSA-2048",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:22",
+      "target": "algorithm:Ed25519",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-gw-01:22",
+      "target": "algorithm:ChaCha20-Poly1305",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "sat-uplink-01:443",
+      "target": "algorithm:ML-KEM-768",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:443",
+      "target": "algorithm:ECDSA-P256",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:443",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:7878",
+      "target": "service:Secure telemetry channel",
+      "kind": "exposes"
+    },
+    {
+      "source": "sat-uplink-01:7878",
+      "target": "algorithm:ML-KEM-768",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:7878",
+      "target": "algorithm:Falcon-512",
+      "kind": "uses"
+    },
+    {
+      "source": "sat-uplink-01:7878",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-telemetry-01:1883",
+      "target": "service:MQTT",
+      "kind": "exposes"
+    },
+    {
+      "source": "vessel-telemetry-01:1883",
+      "target": "evidence:active_tcp_probe",
+      "kind": "evidence"
+    },
+    {
+      "source": "vessel-telemetry-01:8883",
+      "target": "service:MQTT over TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "vessel-telemetry-01:8883",
+      "target": "algorithm:RSA-2048",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-telemetry-01:8883",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-telemetry-01:8883",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-edge-02:502",
+      "target": "service:Modbus/TCP",
+      "kind": "exposes"
+    },
+    {
+      "source": "vessel-edge-02:502",
+      "target": "evidence:well-known port + banner",
+      "kind": "evidence"
+    },
+    {
+      "source": "vessel-edge-02:4840",
+      "target": "service:OPC UA",
+      "kind": "exposes"
+    },
+    {
+      "source": "vessel-edge-02:4840",
+      "target": "algorithm:RSA-2048",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-edge-02:4840",
+      "target": "algorithm:SHA-256",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-api-01:8443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-api-01:8443",
+      "target": "algorithm:ML-KEM-768",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-api-01:8443",
+      "target": "algorithm:ML-DSA-65",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-api-01:8443",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-api-01:5432",
+      "target": "service:PostgreSQL",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-api-01:5432",
+      "target": "algorithm:SCRAM-SHA-256",
+      "kind": "uses"
+    },
+    {
+      "source": "ops-broker-01:5671",
+      "target": "service:AMQP over TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "ops-broker-01:5671",
+      "target": "algorithm:ECDSA-P256",
+      "kind": "uses"
+    },
+    {
+      "source": "ops-broker-01:5671",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "ops-broker-01:5671",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "ops-broker-01:15672",
+      "target": "service:HTTP management",
+      "kind": "exposes"
+    },
+    {
+      "source": "ops-broker-01:15672",
+      "target": "evidence:well-known port + banner",
+      "kind": "evidence"
+    },
+    {
+      "source": "fleet-db-01:5432",
+      "target": "service:PostgreSQL",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-db-01:5432",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-db-01:5432",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "monitoring-01:443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "monitoring-01:443",
+      "target": "algorithm:ECDSA-P256",
+      "kind": "uses"
+    },
+    {
+      "source": "monitoring-01:443",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "monitoring-01:443",
+      "target": "algorithm:AES-128-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "branch-router-01:161",
+      "target": "service:SNMP",
+      "kind": "exposes"
+    },
+    {
+      "source": "branch-router-01:161",
+      "target": "algorithm:HMAC-SHA1",
+      "kind": "uses"
+    },
+    {
+      "source": "branch-router-01:53",
+      "target": "service:DNS",
+      "kind": "exposes"
+    },
+    {
+      "source": "branch-router-01:53",
+      "target": "algorithm:DNSSEC-SHA256",
+      "kind": "uses"
+    },
+    {
+      "source": "fleet-time-01:123",
+      "target": "service:NTP",
+      "kind": "exposes"
+    },
+    {
+      "source": "fleet-time-01:123",
+      "target": "algorithm:NTP-MAC-MD5",
+      "kind": "uses"
+    },
+    {
+      "source": "warehouse-gw-01:443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "warehouse-gw-01:443",
+      "target": "algorithm:RSA-3072",
+      "kind": "uses"
+    },
+    {
+      "source": "warehouse-gw-01:443",
+      "target": "algorithm:ECDHE",
+      "kind": "uses"
+    },
+    {
+      "source": "warehouse-gw-01:443",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "warehouse-gw-01:1883",
+      "target": "service:MQTT",
+      "kind": "exposes"
+    },
+    {
+      "source": "warehouse-gw-01:1883",
+      "target": "evidence:active_tcp_probe",
+      "kind": "evidence"
+    },
+    {
+      "source": "backup-01:443",
+      "target": "service:HTTPS/TLS",
+      "kind": "exposes"
+    },
+    {
+      "source": "backup-01:443",
+      "target": "algorithm:ML-KEM-768",
+      "kind": "uses"
+    },
+    {
+      "source": "backup-01:443",
+      "target": "algorithm:Falcon-512",
+      "kind": "uses"
+    },
+    {
+      "source": "backup-01:443",
+      "target": "algorithm:AES-256-GCM",
+      "kind": "uses"
+    },
+    {
+      "source": "vessel-telemetry-01:1883",
+      "target": "recommendation:crypton-software-proxy",
+      "kind": "candidate_for"
+    },
+    {
+      "source": "vessel-edge-02:502",
+      "target": "recommendation:crypton-hardware-proxy",
+      "kind": "candidate_for"
+    },
+    {
+      "source": "fleet-api-01:8443",
+      "target": "profile:hybrid-pqc-baseline",
+      "kind": "reference_for"
+    }
+  ]
+}
